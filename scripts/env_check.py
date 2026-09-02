@@ -195,7 +195,6 @@ def check_compile_throughput(micro_batch: int = 8) -> None:
     (ok if peak <= MEM_CEILING_GIB else fail)(f"peak memory {peak:.1f} GiB (ceiling {MEM_CEILING_GIB} GiB before WDDM paging)")
     if not torch.isfinite(loss):
         fail("non-finite loss")
-    del m, cm, opt
 
 
 def check_flex() -> None:

@@ -1,3 +1,4 @@
+# ~11.3M params total, ~2.95M non-embedding; the 32768×256 embedding dominates
 vocab_size: 32768
 n_layer: 4
 d_model: 256

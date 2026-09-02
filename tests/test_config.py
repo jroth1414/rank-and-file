@@ -1,6 +1,9 @@
 from dataclasses import dataclass
+
 import pytest
-from rankfile.config import load_yaml, apply_overrides, from_dict, to_yaml
+
+from rankfile.config import apply_overrides, from_dict, load_yaml, to_yaml
+
 
 @dataclass
 class Cfg:

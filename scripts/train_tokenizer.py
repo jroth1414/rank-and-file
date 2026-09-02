@@ -2,9 +2,14 @@
 
 Usage: python scripts/train_tokenizer.py --out data/tokenizer.json --docs 200000
 """
-import argparse, itertools, os
+import argparse
+import itertools
+import os
+
 from datasets import load_dataset
+
 from rankfile.tokenizer import train_tokenizer
+
 
 def main():
     ap = argparse.ArgumentParser()

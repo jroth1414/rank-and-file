@@ -1,4 +1,6 @@
-﻿import pytest, torch
+import pytest
+import torch
+
 from rankfile.model import ModelConfig, Transformer, doc_block_mask
 
 pytestmark = pytest.mark.gpu

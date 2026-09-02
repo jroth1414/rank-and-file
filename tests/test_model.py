@@ -1,6 +1,10 @@
-import torch
+from pathlib import Path
+
 import pytest
-from rankfile.model import ModelConfig, Transformer, RMSNorm, precompute_rope, apply_rope
+import torch
+
+from rankfile.model import ModelConfig, RMSNorm, Transformer, apply_rope, precompute_rope
+
 
 def test_forward_shape(tiny_cfg):
     m = Transformer(tiny_cfg)
@@ -94,9 +98,10 @@ def test_num_params_m124_shape():
     assert abs(total - 100.7e6) < 0.5e6 and abs(nonemb - 75.5e6) < 0.5e6
 
 def test_model_configs_load_and_have_expected_sizes():
-    from rankfile.config import load_yaml, from_dict
-    m124 = from_dict(ModelConfig, load_yaml("configs/model/m124.yaml"))
-    m30 = from_dict(ModelConfig, load_yaml("configs/model/m30.yaml"))
+    from rankfile.config import from_dict, load_yaml
+    configs_dir = Path(__file__).resolve().parents[1] / "configs" / "model"
+    m124 = from_dict(ModelConfig, load_yaml(configs_dir / "m124.yaml"))
+    m30 = from_dict(ModelConfig, load_yaml(configs_dir / "m30.yaml"))
     assert (m124.n_layer, m124.d_model, m124.n_head, m124.n_kv_head) == (12, 768, 12, 4)
     assert m30.vocab_size == m124.vocab_size == 32768 and m30.max_seq_len == 2048
     total, _ = Transformer(m30).num_params()

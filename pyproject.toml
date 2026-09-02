@@ -36,6 +36,10 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "E702", "E401"]
+"scripts/*" = ["E501", "E702", "E401"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["gpu: requires a CUDA device"]

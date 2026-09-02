@@ -100,9 +100,9 @@ invalidates the comparison. If you think one must change, stop and ask.
 | Layers / width | 12 / 768 | ~75M non-embedding, ~100M total |
 | Context | 2048, intra-document masking | |
 
-A `m30` config (fewer layers, narrower) exists for smoke tests only. It
-must run the full pipeline end to end in minutes. **No long run is ever
-launched without a passing `m30` smoke run of the same code.**
+A `m30` config (fewer layers, narrower; measured ~11.3M total, ~3M non-embedding)
+exists for smoke tests only. It must run the full pipeline end to end in minutes.
+**No long run is ever launched without a passing `m30` smoke run of the same code.**
 
 The optimizer-coupled recipes (modded-nanogpt, nanochat: value embeddings,
 U-net skips, ReLU², etc.) are deliberately **not** used. Do not add their

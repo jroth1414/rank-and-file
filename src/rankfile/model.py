@@ -146,7 +146,7 @@ class Transformer(nn.Module):
     def forward(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, pos_offset: int = 0) -> torch.Tensor:
         return F.linear(self.hidden(idx, doc_ids, block_mask, pos_offset), self.lm_head_weight())
 
-    def loss(self, idx: torch.Tensor, targets: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, chunk: int = 512) -> torch.Tensor:
+    def loss(self, idx: torch.Tensor, targets: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, chunk: int = 256) -> torch.Tensor:
         h = self.hidden(idx, doc_ids, block_mask)          # [B,T,D]
         w = self.lm_head_weight()
         B, T, _ = h.shape

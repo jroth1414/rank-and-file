@@ -1,0 +1,39 @@
+# experiment outputs and data — never committed
+runs/
+data/
+notebooks/**/outputs/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.ckpt
+wandb/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# claude code local settings
+.claude/settings.local.json
+
+# paper build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz

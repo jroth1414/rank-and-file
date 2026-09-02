@@ -1,0 +1,39 @@
+[project]
+name = "rank-and-file"
+version = "0.0.1"
+description = "Do Muon-pretrained language models fine-tune differently under LoRA? Matched AdamW/Muon twins, a LoRA-rank grid, and spectral analysis of what a low-rank adapter can recover."
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    # torch is installed separately from the cu128 index (sm_120 kernels); see README
+    "numpy>=1.26",
+    "tokenizers>=0.20",
+    "datasets>=3.0",
+    "pyyaml>=6.0",
+    "safetensors>=0.4",
+    "tqdm>=4.66",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

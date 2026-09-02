@@ -26,6 +26,13 @@
 - `Transformer.loss` accepts `ignore_index: int = -100` and divides by the count of non-ignored targets; pretraining never uses it, Plan 5's supervised task does.
 - Run `.venv\Scripts\python.exe -m ruff check .` before every commit; `src/` is held to 100 columns, `tests/` and `scripts/` have E501/E702/E401 ignored.
 
+## Notes from the Plan 2 final review (read before Task 1 and Task 3)
+
+- The data permutation depends on `(total_tokens, seq_len, seed)`. If a shard is added, truncated, or rebuilt, `total_tokens` changes and the whole order changes silently. **`save_checkpoint` must store `train_stream.total_tokens`, `cfg.seed`, and `cfg.seq_len` in `extra`, and `train()` must raise on resume if any of them differ** from the live stream and config. Add a test to `test_resume.py`: resuming against a directory with one extra shard raises.
+- Data exhaustion: `FixedOrderSampler.start` raises `IndexError` past `n_windows`. That is intended (explicit failure beats silent wraparound). The smoke directory has only 24,403 windows (~50M tokens); the smoke config's 20 steps × 32 micro-batches × 8 = 5,120 windows is fine.
+- Targets at EOT positions (the next document's first token) stay in the loss. No `ignore_index` for pretraining; the fraction is ~0.1% and identical across arms.
+- `data/fineweb_edu/manifest.json` (written by `prepare_data.py`) records per-shard token counts and the tokenizer hash; `TokenStream` verifies shard sizes against it when present. A mismatch raises before training starts.
+
 ## Consumed interfaces (from Plans 1–3)
 
 - `rankfile.config`: `load_yaml`, `apply_overrides`, `from_dict`, `to_yaml`.

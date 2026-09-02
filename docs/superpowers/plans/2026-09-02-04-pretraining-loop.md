@@ -19,6 +19,13 @@
 - Never launch a multi-hour run without asking the user. The m30 smoke run is the only run this plan launches unprompted.
 - Commit prefix `train:`; no AI attribution trailers.
 
+## Notes from the Plan 1 final review (read before Task 3)
+
+- `doc_block_mask` at B=8, T=2048 costs about 4.5 ms and a 320 MiB transient per call (measured 2026-09-02). Over 32 micro-steps that is ~144 ms per optimizer step, about 2%. Acceptable, but pass `_compile=True` to `create_block_mask` inside `doc_block_mask` if profiling shows it matters, and never build the mask inside the compiled loss.
+- `Transformer.forward` materializes full `[B,T,V]` logits (8.6 GB fp32 at the m124 shape). Only `Transformer.loss` is memory-safe at scale; evaluation must go through `loss`.
+- `Transformer.loss` accepts `ignore_index: int = -100` and divides by the count of non-ignored targets; pretraining never uses it, Plan 5's supervised task does.
+- Run `.venv\Scripts\python.exe -m ruff check .` before every commit; `src/` is held to 100 columns, `tests/` and `scripts/` have E501/E702/E401 ignored.
+
 ## Consumed interfaces (from Plans 1–3)
 
 - `rankfile.config`: `load_yaml`, `apply_overrides`, `from_dict`, `to_yaml`.

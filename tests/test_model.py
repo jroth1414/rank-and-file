@@ -71,3 +71,24 @@ def test_doc_mask_equals_causal_when_single_doc(tiny_cfg):
         a = m(idx)
         b = m(idx, torch.zeros(2, 16, dtype=torch.long))
     assert torch.allclose(a, b, atol=1e-4)
+
+def test_loss_matches_unchunked(tiny_cfg):
+    torch.manual_seed(0)
+    m = Transformer(tiny_cfg)
+    idx = torch.randint(0, tiny_cfg.vocab_size, (2, 16)); tgt = torch.randint(0, tiny_cfg.vocab_size, (2, 16))
+    ref = torch.nn.functional.cross_entropy(m(idx).float().view(-1, tiny_cfg.vocab_size), tgt.view(-1))
+    assert torch.allclose(m.loss(idx, tgt, chunk=5), ref, atol=1e-5)
+
+def test_param_groups_partition(tiny_cfg):
+    m = Transformer(tiny_cfg)
+    hidden, other = m.hidden_matrix_params(), m.other_params()
+    ids = {id(p) for p in m.parameters()}
+    assert {id(p) for p in hidden} | {id(p) for p in other} == ids
+    assert not ({id(p) for p in hidden} & {id(p) for p in other})
+    assert all(p.ndim == 2 for p in hidden)
+    assert id(m.embed.weight) in {id(p) for p in other}
+
+def test_num_params_m124_shape():
+    m = Transformer(ModelConfig())
+    total, nonemb = m.num_params()
+    assert abs(total - 100.7e6) < 0.5e6 and abs(nonemb - 75.5e6) < 0.5e6

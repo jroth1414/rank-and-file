@@ -146,6 +146,29 @@ class Transformer(nn.Module):
     def forward(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, pos_offset: int = 0) -> torch.Tensor:
         return F.linear(self.hidden(idx, doc_ids, block_mask, pos_offset), self.lm_head_weight())
 
+    def loss(self, idx: torch.Tensor, targets: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, chunk: int = 512) -> torch.Tensor:
+        h = self.hidden(idx, doc_ids, block_mask)          # [B,T,D]
+        w = self.lm_head_weight()
+        B, T, _ = h.shape
+        total = h.new_zeros((), dtype=torch.float32)
+        for s in range(0, T, chunk):
+            logits = F.linear(h[:, s:s + chunk], w).float()  # [B,c,V] fp32, one chunk at a time
+            total = total + F.cross_entropy(
+                logits.reshape(-1, logits.shape[-1]), targets[:, s:s + chunk].reshape(-1), reduction="sum")
+        return total / (B * T)
+
+    def hidden_matrix_params(self) -> list[nn.Parameter]:
+        return [p for n, p in self.blocks.named_parameters() if p.ndim == 2]
+
+    def other_params(self) -> list[nn.Parameter]:
+        hidden = {id(p) for p in self.hidden_matrix_params()}
+        return [p for p in self.parameters() if id(p) not in hidden]
+
+    def num_params(self) -> tuple[int, int]:
+        total = sum(p.numel() for p in self.parameters())
+        emb = self.embed.weight.numel() + (0 if self.cfg.tie_embeddings else self.lm_head.weight.numel())
+        return total, total - emb
+
 
 def doc_block_mask(doc_ids: torch.Tensor) -> BlockMask:
     """Causal AND same-document block mask for FlexAttention. doc_ids: [B,T] long."""

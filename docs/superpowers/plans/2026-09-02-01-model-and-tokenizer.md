@@ -674,28 +674,34 @@ git commit -m "config: m124 and m30 model configs"
 ```python
 # tests/test_model_gpu.py
 import pytest, torch
-from rankfile.model import ModelConfig, Transformer
+from rankfile.model import ModelConfig, Transformer, doc_block_mask
 
 pytestmark = pytest.mark.gpu
 
-def test_m124_forward_backward_under_memory_ceiling():
+def test_m124_compiled_loss_under_memory_ceiling():
+    """Mirrors the training loop: block mask built outside, loss compiled. Eager flex would use ~18 GiB."""
     torch.cuda.reset_peak_memory_stats()
     m = Transformer(ModelConfig()).cuda()
     idx = torch.randint(0, 32768, (8, 2048), device="cuda"); tgt = torch.randint(0, 32768, (8, 2048), device="cuda")
     doc = torch.zeros(8, 2048, dtype=torch.long, device="cuda"); doc[:, 1024:] = 1
+    bm = doc_block_mask(doc)
+    loss_fn = torch.compile(m.loss, dynamic=False)
     with torch.autocast("cuda", dtype=torch.bfloat16):
-        loss = m.loss(idx, tgt, doc)
+        loss = loss_fn(idx, tgt, block_mask=bm)
     loss.backward()
     torch.cuda.synchronize()
+    peak = torch.cuda.max_memory_allocated() / 2**30
     assert torch.isfinite(loss)
-    assert torch.cuda.max_memory_allocated() / 2**30 < 14.0
-    assert abs(loss.item() - 10.4) < 1.0  # ln(32768)=10.4 at init
+    assert peak < 14.0, f"peak {peak:.1f} GiB"
+    assert abs(loss.item() - 10.4) < 1.0, loss.item()  # ln(32768)=10.4 at init
 ```
+
+Why compiled: uncompiled `flex_attention` materializes the full `B×H×T×T` score matrix for every layer (measured 18.0 GiB eager vs 7.5 GiB compiled on 2026-09-02). Every training and evaluation path in Plans 4 and 5 compiles the loss, so the memory guarantee is a compiled-path guarantee. Never run the 8×2048 shape through eager `flex_attention`.
 
 - [ ] **Step 2: Run**
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_model_gpu.py -v`
-Expected: PASS. If the memory assertion fails, lower `chunk` in `loss()` to 256; do not shrink the model.
+Expected: PASS with peak around 7 GiB. Do not shrink the model or the chunk size to make it pass.
 
 - [ ] **Step 3: Commit**
 

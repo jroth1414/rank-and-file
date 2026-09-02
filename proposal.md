@@ -1,7 +1,7 @@
 # Does Muon Pretraining Change What LoRA Can Learn? Optimizer, Weight Spectra, and Low-Rank Fine-Tunability
 
 **Course:** EN.705.743 ChatGPT from Scratch: Building and Training Large Language Models, Fall 2026
-**Student:** [Your name]
+**Student:** John Roth
 **Proposal date:** September 29, 2026
 **Deliverables:** Presentation December 1, 2026; research paper December 8, 2026
 

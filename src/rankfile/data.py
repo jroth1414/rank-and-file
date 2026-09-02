@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import torch
 
-from rankfile.tokenizer import EOT_ID  # noqa: F401  # Task 2 uses this
+from rankfile.tokenizer import EOT_ID
 
 
 def write_shard(tokens: np.ndarray, path: str | Path) -> None:
@@ -45,3 +46,36 @@ class TokenStream:
             i += 1
             pos = 0
         return out
+
+
+class FixedOrderSampler:
+    """Seeded permutation of non-overlapping windows of seq_len+1 tokens."""
+
+    def __init__(self, total_tokens: int, seq_len: int, seed: int):
+        self.stride = seq_len + 1
+        self.n_windows = total_tokens // self.stride
+        self.perm = np.random.default_rng(seed).permutation(self.n_windows)
+
+    def start(self, i: int) -> int:
+        if i >= self.n_windows:
+            raise IndexError(f"window {i} >= {self.n_windows}; data exhausted")
+        return int(self.perm[i]) * self.stride
+
+
+def doc_ids_from_tokens(x: torch.Tensor) -> torch.Tensor:
+    """Document index per token; an EOT token belongs to the document it ends."""
+    eot = (x == EOT_ID).long()
+    return torch.cumsum(eot, dim=1) - eot
+
+
+def make_batch(stream: TokenStream, sampler: FixedOrderSampler, position: int,
+               micro_batch: int, seq_len: int,
+               device) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    buf = np.stack([stream.window(sampler.start(position + j), seq_len + 1)
+                    for j in range(micro_batch)])
+    t = torch.from_numpy(buf.astype(np.int64))
+    x, y = t[:, :-1], t[:, 1:]
+    d = doc_ids_from_tokens(x)
+    return x.to(device, non_blocking=True), y.to(device,
+                                                  non_blocking=True), d.to(
+                                                      device, non_blocking=True)

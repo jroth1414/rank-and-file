@@ -30,3 +30,33 @@ def test_list_shards_sorted_by_split(tmp_path):
     write_shard(np.zeros(3, dtype=np.uint16), tmp_path / "val_0000.bin")
     assert [p.name for p in list_shards(tmp_path, "train")] == ["train_0000.bin", "train_0001.bin"]
     assert [p.name for p in list_shards(tmp_path, "val")] == ["val_0000.bin"]
+
+def test_sampler_is_permutation_and_deterministic():
+    from rankfile.data import FixedOrderSampler
+    a = FixedOrderSampler(total_tokens=1000, seq_len=9, seed=0)
+    b = FixedOrderSampler(total_tokens=1000, seq_len=9, seed=0)
+    c = FixedOrderSampler(total_tokens=1000, seq_len=9, seed=1)
+    assert a.n_windows == 1000 // 10
+    starts = [a.start(i) for i in range(a.n_windows)]
+    assert sorted(starts) == [i * 10 for i in range(a.n_windows)]
+    assert starts == [b.start(i) for i in range(b.n_windows)]
+    assert starts != [c.start(i) for i in range(c.n_windows)]
+
+def test_doc_ids_from_tokens():
+    import torch
+
+    from rankfile.data import doc_ids_from_tokens
+    x = torch.tensor([[5, 6, 0, 7, 8, 0, 9]])
+    assert doc_ids_from_tokens(x).tolist() == [[0, 0, 0, 1, 1, 1, 2]]
+
+def test_make_batch_shapes_and_shift(tmp_path):
+    import torch
+
+    from rankfile.data import FixedOrderSampler, make_batch
+    stream = TokenStream(_mk(tmp_path, [200]))
+    samp = FixedOrderSampler(stream.total_tokens, seq_len=8, seed=0)
+    x, y, d = make_batch(stream, samp, position=0, micro_batch=4, seq_len=8, device="cpu")
+    assert x.shape == y.shape == d.shape == (4, 8) and x.dtype == torch.long
+    assert torch.equal(y[:, :-1], x[:, 1:])
+    x2, _, _ = make_batch(stream, samp, position=4, micro_batch=4, seq_len=8, device="cpu")
+    assert not torch.equal(x, x2)

@@ -106,3 +106,27 @@ def test_model_configs_load_and_have_expected_sizes():
     assert m30.vocab_size == m124.vocab_size == 32768 and m30.max_seq_len == 2048
     total, _ = Transformer(m30).num_params()
     assert total < 25e6
+
+
+def test_qk_norm_applied_per_head(tiny_cfg):
+    m = Transformer(tiny_cfg).eval()
+    a = m.blocks[0].attn
+    with torch.no_grad():
+        a.q_norm.weight.fill_(1.0); a.k_norm.weight.fill_(1.0)
+        x = torch.randn(1, 8, tiny_cfg.d_model) * 7
+        q = a.q_norm(a.q(x).view(1, 8, a.n_head, a.head_dim))
+        k = a.k_norm(a.k(x).view(1, 8, a.n_kv_head, a.head_dim))
+    assert torch.allclose(q.pow(2).mean(-1), torch.ones_like(q[..., 0]), atol=1e-4)
+    assert torch.allclose(k.pow(2).mean(-1), torch.ones_like(k[..., 0]), atol=1e-4)
+    assert a.q_norm.weight.shape == (tiny_cfg.head_dim,)  # per head, not per d_model
+
+
+def test_loss_ignore_index_excludes_masked_targets(tiny_cfg):
+    torch.manual_seed(0)
+    m = Transformer(tiny_cfg)
+    idx = torch.randint(0, tiny_cfg.vocab_size, (2, 16))
+    tgt = torch.randint(0, tiny_cfg.vocab_size, (2, 16))
+    tgt[:, ::2] = -100  # ignore half the targets
+    logits = m(idx).float().view(-1, tiny_cfg.vocab_size)
+    ref = torch.nn.functional.cross_entropy(logits, tgt.view(-1), ignore_index=-100)
+    assert torch.allclose(m.loss(idx, tgt, chunk=5), ref, atol=1e-5)

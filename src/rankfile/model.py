@@ -176,18 +176,22 @@ class Transformer(nn.Module):
         doc_ids: torch.Tensor | None = None,
         block_mask: BlockMask | None = None,
         chunk: int = 512,
+        ignore_index: int = -100,
     ) -> torch.Tensor:
         h = self.hidden(idx, doc_ids, block_mask)          # [B,T,D]
         w = self.lm_head_weight()
         B, T, _ = h.shape
         total = h.new_zeros((), dtype=torch.float32)
+        n = h.new_zeros((), dtype=torch.long)
         for s in range(0, T, chunk):
             logits = F.linear(h[:, s:s + chunk], w).float()  # [B,c,V] fp32, one chunk at a time
+            t = targets[:, s:s + chunk]
             total = total + F.cross_entropy(
-                logits.reshape(-1, logits.shape[-1]), targets[:, s:s + chunk].reshape(-1),
-                reduction="sum",
+                logits.reshape(-1, logits.shape[-1]), t.reshape(-1),
+                reduction="sum", ignore_index=ignore_index,
             )
-        return total / (B * T)
+            n = n + (t != ignore_index).sum()
+        return total / n.clamp(min=1)
 
     def hidden_matrix_params(self) -> list[nn.Parameter]:
         return [p for p in self.blocks.parameters() if p.ndim == 2]

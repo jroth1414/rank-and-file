@@ -48,3 +48,24 @@ def test_init_scales(tiny_cfg):
     o = m.blocks[0].attn.o.weight.std().item()
     expected = tiny_cfg.init_std / (2 * tiny_cfg.n_layer) ** 0.5
     assert abs(o - expected) < 0.005
+
+def test_doc_mask_blocks_cross_document_attention(tiny_cfg):
+    """Output for doc 2 with masking must equal running doc 2 alone (up to fp error)."""
+    torch.manual_seed(0)
+    m = Transformer(tiny_cfg).eval()
+    T = 16
+    idx = torch.randint(1, tiny_cfg.vocab_size, (1, T))
+    doc_ids = torch.zeros(1, T, dtype=torch.long); doc_ids[0, 8:] = 1
+    with torch.no_grad():
+        masked = m(idx, doc_ids)[0, 8:]
+        alone = m(idx[:, 8:], pos_offset=8)[0]   # same RoPE positions as inside the window
+    assert torch.allclose(masked, alone, atol=1e-4), (masked - alone).abs().max()
+
+def test_doc_mask_equals_causal_when_single_doc(tiny_cfg):
+    torch.manual_seed(0)
+    m = Transformer(tiny_cfg).eval()
+    idx = torch.randint(1, tiny_cfg.vocab_size, (2, 16))
+    with torch.no_grad():
+        a = m(idx)
+        b = m(idx, torch.zeros(2, 16, dtype=torch.long))
+    assert torch.allclose(a, b, atol=1e-4)

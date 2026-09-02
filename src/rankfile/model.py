@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.attention.flex_attention import BlockMask, create_block_mask, flex_attention
 
 
 @dataclass
@@ -78,8 +79,8 @@ class Attention(nn.Module):
         return self.o(y.transpose(1, 2).reshape(B, T, self.n_head * self.head_dim))
 
 
-def _flex(q, k, v, block_mask):  # replaced in Task 3
-    raise NotImplementedError("document masking is implemented in Task 3")
+def _flex(q, k, v, block_mask: BlockMask):
+    return flex_attention(q, k, v, block_mask=block_mask, enable_gqa=True)
 
 
 class MLP(nn.Module):
@@ -131,16 +132,26 @@ class Transformer(nn.Module):
     def lm_head_weight(self) -> torch.Tensor:
         return self.embed.weight if self.cfg.tie_embeddings else self.lm_head.weight
 
-    def hidden(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None) -> torch.Tensor:
-        block_mask = None if doc_ids is None else doc_block_mask(doc_ids)
+    def hidden(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, pos_offset: int = 0) -> torch.Tensor:
+        if block_mask is None and doc_ids is not None:
+            block_mask = doc_block_mask(doc_ids)
+        T = idx.shape[1]
+        cos = self.rope_cos[:, :, pos_offset:pos_offset + T]
+        sin = self.rope_sin[:, :, pos_offset:pos_offset + T]
         x = self.embed(idx)
         for blk in self.blocks:
-            x = blk(x, self.rope_cos, self.rope_sin, block_mask)
+            x = blk(x, cos, sin, block_mask)
         return self.norm_f(x)
 
-    def forward(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None) -> torch.Tensor:
-        return F.linear(self.hidden(idx, doc_ids), self.lm_head_weight())
+    def forward(self, idx: torch.Tensor, doc_ids: torch.Tensor | None = None, block_mask=None, pos_offset: int = 0) -> torch.Tensor:
+        return F.linear(self.hidden(idx, doc_ids, block_mask, pos_offset), self.lm_head_weight())
 
 
-def doc_block_mask(doc_ids: torch.Tensor):  # implemented in Task 3
-    raise NotImplementedError
+def doc_block_mask(doc_ids: torch.Tensor) -> BlockMask:
+    """Causal AND same-document block mask for FlexAttention. doc_ids: [B,T] long."""
+    B, T = doc_ids.shape
+
+    def mask_mod(b, h, q_idx, kv_idx):
+        return (q_idx >= kv_idx) & (doc_ids[b, q_idx] == doc_ids[b, kv_idx])
+
+    return create_block_mask(mask_mod, B, None, T, T, device=doc_ids.device)

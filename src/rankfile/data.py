@@ -1,6 +1,8 @@
 """Token shards and a fixed-order, resumable micro-batch loader."""
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,9 +12,13 @@ from rankfile.tokenizer import EOT_ID
 
 
 def write_shard(tokens: np.ndarray, path: str | Path) -> None:
-    assert tokens.dtype == np.uint16
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    tokens.tofile(str(path))
+    if tokens.dtype != np.uint16:
+        raise TypeError(f"tokens must be uint16, got {tokens.dtype}")
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(str(path) + ".tmp")
+    tokens.tofile(str(tmp))
+    os.replace(tmp, path)
 
 
 def list_shards(dir: str | Path, split: str) -> list[Path]:
@@ -25,10 +31,23 @@ class TokenStream:
     def __init__(self, shard_paths: list[Path]):
         if not shard_paths:
             raise ValueError("no shards")
+        shard_paths = [Path(p) for p in shard_paths]
         self.mm = [np.memmap(p, dtype=np.uint16, mode="r") for p in shard_paths]
         self.sizes = np.array([len(m) for m in self.mm], dtype=np.int64)
         self.offsets = np.concatenate([[0], np.cumsum(self.sizes)])
         self.total_tokens = int(self.offsets[-1])
+
+        manifest_path = shard_paths[0].parent / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            shard_counts = manifest.get("shards", {})
+            for path, size in zip(shard_paths, self.sizes, strict=True):
+                expected = shard_counts.get(path.name)
+                if expected is not None and int(size) != expected:
+                    raise ValueError(
+                        f"shard {path.name} has {int(size)} tokens, "
+                        f"manifest expects {expected}"
+                    )
 
     def window(self, start: int, length: int) -> np.ndarray:
         if start < 0 or start + length > self.total_tokens:
@@ -57,8 +76,8 @@ class FixedOrderSampler:
         self.perm = np.random.default_rng(seed).permutation(self.n_windows)
 
     def start(self, i: int) -> int:
-        if i >= self.n_windows:
-            raise IndexError(f"window {i} >= {self.n_windows}; data exhausted")
+        if not 0 <= i < self.n_windows:
+            raise IndexError(f"window {i} out of range [0, {self.n_windows})")
         return int(self.perm[i]) * self.stride
 
 
@@ -70,7 +89,7 @@ def doc_ids_from_tokens(x: torch.Tensor) -> torch.Tensor:
 
 def make_batch(stream: TokenStream, sampler: FixedOrderSampler, position: int,
                micro_batch: int, seq_len: int,
-               device) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+               device: torch.device | str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     buf = np.stack([stream.window(sampler.start(position + j), seq_len + 1)
                     for j in range(micro_batch)])
     t = torch.from_numpy(buf.astype(np.int64))

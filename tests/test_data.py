@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pytest
 
@@ -24,6 +26,43 @@ def test_window_out_of_range(tmp_path):
     s = TokenStream(_mk(tmp_path, [10]))
     with pytest.raises(ValueError):
         s.window(5, 6)
+
+def test_write_shard_is_atomic_and_round_trips(tmp_path):
+    p = tmp_path / "train_0000.bin"
+    write_shard(np.arange(10, dtype=np.uint16), p)
+    assert not (tmp_path / "train_0000.bin.tmp").exists()
+    assert list(tmp_path.glob("*.tmp")) == []
+    s = TokenStream([p])
+    assert s.window(0, 10).tolist() == list(range(10))
+
+def test_write_shard_rejects_wrong_dtype(tmp_path):
+    with pytest.raises(TypeError):
+        write_shard(np.arange(10, dtype=np.int32), tmp_path / "train_0000.bin")
+
+def test_token_stream_verifies_manifest_counts(tmp_path):
+    paths = _mk(tmp_path, [10, 5])
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"shards": {"train_0000.bin": 10, "train_0001.bin": 999}})
+    )
+    with pytest.raises(ValueError):
+        TokenStream(paths)
+
+def test_token_stream_manifest_ignores_unlisted_shards(tmp_path):
+    paths = _mk(tmp_path, [10, 5])
+    (tmp_path / "manifest.json").write_text(json.dumps({"shards": {"train_0000.bin": 10}}))
+    s = TokenStream(paths)
+    assert s.total_tokens == 15
+
+def test_token_stream_works_with_no_manifest(tmp_path):
+    paths = _mk(tmp_path, [10, 5])
+    s = TokenStream(paths)
+    assert s.total_tokens == 15
+
+def test_sampler_start_rejects_negative_index():
+    from rankfile.data import FixedOrderSampler
+    s = FixedOrderSampler(total_tokens=1000, seq_len=9, seed=0)
+    with pytest.raises(IndexError):
+        s.start(-1)
 
 def test_list_shards_sorted_by_split(tmp_path):
     _mk(tmp_path, [3, 3])

@@ -31,18 +31,22 @@ runs/         (gitignored) one directory per run
 data/         (gitignored) tokenized shards, tokenizer, task data
 ```
 
-## Setup (planned)
+## Setup
 
-All experiments run on a single RTX 5070 Ti (16 GB) under WSL2.
+All experiments run on a single RTX 5070 Ti (16 GB) on native Windows 11.
+`torch.compile` works through the `triton-windows` package; WSL2 is not needed.
 
-```bash
-wsl --install -d Ubuntu          # once, from Windows
-# inside WSL:
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install -e ".[dev]"
-pytest
+```powershell
+uv venv .venv --python 3.11
+uv pip install --index-url https://download.pytorch.org/whl/cu130 torch
+uv pip install -e ".[dev]"
+.venv\Scripts\python.exe scripts\env_check.py   # verifies GPU, SDPA backends, compile, FlexAttention
+.venv\Scripts\python.exe -m pytest
 ```
+
+Verified stack (2026-09-01): torch 2.14.0+cu130, triton-windows 3.8.0,
+driver 610.88. Compiled throughput for the 124M model is about 80k tokens per
+second at micro-batch 8, or 3.5 hours per billion tokens.
 
 ## Reproducing a run (planned)
 

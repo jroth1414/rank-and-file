@@ -108,22 +108,61 @@ The optimizer-coupled recipes (modded-nanogpt, nanochat: value embeddings,
 U-net skips, ReLU², etc.) are deliberately **not** used. Do not add their
 tricks.
 
-## 5. Hardware and environment
+## 5. Hardware and environment (verified 2026-09-01)
 
-- **GPU:** single NVIDIA RTX 5070 Ti, 16 GB, Blackwell **sm_120**, driver 610.88.
-  ~88 TFLOPS bf16 with fp32 accumulate. Expect 40k–80k tok/s on the 124M model
-  → 3.5–7 h per 1B tokens. Everything runs here; the ~$500 cloud budget is a
-  **reserve for reruns only**, not part of the plan.
-- **OS:** Windows 11. Native Python 3.11.9 is present. **WSL2 is not yet
-  installed** (checked 2026-09-01). The plan assumes WSL2 + Ubuntu because
-  `torch.compile` depends on Triton, which is unreliable on native Windows.
-  First task in week 1 is `wsl --install -d Ubuntu`, then verify
-  `torch.compile` + flash SDPA on sm_120.
-- **PyTorch:** ≥ 2.7 from the **cu128** index. Older wheels have no sm_120 kernels.
+Everything below was measured on this machine with `scripts/env_check.py`.
+**Run that script before any long job**; it fails loudly if the stack drifted.
+
+- **Machine:** Windows 11 Pro 26200, Ryzen 5 7500X3D (6c/12t), 31 GB RAM.
+  Drives: **D: 2 TB free** (repo, venv, `data/`, `runs/` all live here),
+  C: 63 GB free (only the Inductor cache in `%TEMP%\torchinductor_Admin`).
+- **GPU:** single RTX 5070 Ti, 16 GB, Blackwell **sm_120**, driver 610.88 (CUDA 13.3 capable),
+  **WDDM mode** (it also drives the display; ~1.6 GB is taken by the desktop).
+  Measured **100 TFLOPS** bf16 matmul with fp32 accumulate.
+- **Stack: native Windows, no WSL2.** `.venv` (uv, Python 3.11.9) with
+  **torch 2.14.0+cu130** and **triton-windows 3.8.0**. `torch.compile` works.
+  Install: `uv venv .venv --python 3.11 && uv pip install --index-url https://download.pytorch.org/whl/cu130 torch && uv pip install -e ".[dev]"`.
+  The global Python has a broken torch install (missing `sympy`); never use it.
+- **Measured throughput, m124 shape, micro-batch 8 × 2048, AdamW fused:**
+
+  | Mode | tok/s | peak mem | h per 1B tokens |
+  |---|---|---|---|
+  | eager | 39k | 14.5 GiB | 7.1 |
+  | `torch.compile` | **80k** | **7.6 GiB** | **3.5** |
+
+  Plan with the compiled number. Real training adds data loading, Muon's
+  Newton–Schulz, logging, and checkpoints, so expect 60–80k in practice.
+- **Attention backends:** flash SDPA has **no kernel** in the Windows build.
+  cuDNN SDPA works and is fastest (1.2 ms for B16 H12 T2048 D64 causal);
+  memory-efficient works (2.3 ms). `F.scaled_dot_product_attention(..., is_causal=True, enable_gqa=True)`
+  dispatches correctly. **FlexAttention** with a document block mask and GQA
+  compiles, runs at 2.8 ms fwd+bwd (B8), and matches a dense-mask reference.
+  Use FlexAttention for intra-document masking.
+- **WDDM memory trap:** Windows lets CUDA oversubscribe into system RAM
+  instead of raising OOM. Micro-batch 16 eager "worked" at 27.6 GiB and ran
+  at 3.5k tok/s, 11× slower. **Keep peak allocated ≤ 14 GiB**, use micro-batch
+  8 with gradient accumulation to reach ~0.5M tokens per step, and have the
+  training loop assert `torch.cuda.max_memory_allocated()` stays under the ceiling.
+  The fp32 logits for cross-entropy are the largest single tensor at 32k vocab;
+  compile fuses much of that, and a chunked loss is the fallback.
+- **Sleep/restart:** AC sleep and hibernate timeouts are 0 (never). Windows
+  Update active hours are 11:00–05:00, so an automatic restart can land
+  between 05:00 and 11:00. Before a multi-day run, pause updates
+  (Settings → Windows Update → Pause) or extend active hours.
+- **TDR** (GPU watchdog) is at the 2 s default. Training kernels are ms-scale;
+  if a Newton–Schulz or loss kernel ever trips it, raise `TdrDelay` rather than
+  shrinking the work.
+- **Windows long paths** are not enabled (`LongPathsEnabled` unset). Inductor
+  cache paths have been fine so far; if compile fails with a path error,
+  enable it in the registry or move `TORCHINDUCTOR_CACHE_DIR` to a short path on D:.
+- **HF datasets:** streaming from `HuggingFaceFW/fineweb-edu` (sample-10BT)
+  and `HuggingFaceTB/finemath` works. The hub warns about symlinks on
+  Windows; set `HF_HUB_DISABLE_SYMLINKS_WARNING=1` or enable Developer Mode.
+  Set `HF_HOME` to a directory on D: before the first download.
 - **Precision:** bf16 autocast, fp32 master weights and optimizer states.
-- **Memory** is not a constraint at 124M. If OOM appears, something is wrong; do not "fix" it by shrinking the model.
 - Long runs: **checkpoint at least hourly, resume automatically**, launch from
   the queue script so the card is never idle. A crash must cost < 1 h.
+- The ~$500 cloud budget is a **reserve for reruns only**, not part of the plan.
 
 ## 6. Repository layout and conventions
 
@@ -268,6 +307,12 @@ Append, never rewrite. Format: date, decision, reason.
   to stretch so the core is finishable in weeks 1–4 on one GPU.
 - **2026-09-01** — All compute local on the 5070 Ti by the student's choice;
   cloud budget is a reserve. Second seeds scheduled after the first FT grid.
+- **2026-09-01** — Environment audit: **native Windows, no WSL2.** torch
+  2.14.0+cu130 + triton-windows 3.8 gives working `torch.compile` (80k tok/s,
+  7.6 GiB at micro-batch 8) and FlexAttention. Flash SDPA has no Windows kernel;
+  cuDNN SDPA is used instead. Global Python's torch is broken (no sympy); the
+  project uses `.venv` via uv. Micro-batch capped at 8 because WDDM pages to
+  system RAM instead of OOM-ing.
 
 ## 12. Key references (full list in proposal.md)
 

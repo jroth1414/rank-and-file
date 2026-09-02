@@ -5,7 +5,8 @@ description = "Do Muon-pretrained language models fine-tune differently under Lo
 requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
-    # torch is installed separately from the cu128 index (sm_120 kernels); see README
+    # torch is installed separately from the cu130 index (sm_120 kernels); see README
+    "triton-windows>=3.8; sys_platform == 'win32'",
     "numpy>=1.26",
     "tokenizers>=0.20",
     "datasets>=3.0",

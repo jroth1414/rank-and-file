@@ -102,7 +102,7 @@ If the core grid is complete on schedule, the same checkpoints support a circuit
 
 ## 5. Compute plan
 
-All training and analysis runs on a single RTX 5070 Ti with 16 GB of memory. The card's bf16 matmul rate with fp32 accumulation is about 88 TFLOPS, comparable to an RTX 4090. At the 35 to 50% utilization that small models reach with torch.compile and flash attention, the 124M model trains at roughly 40k to 80k tokens per second, or 3.5 to 7 hours per billion tokens. Memory is not a constraint at this size. Every estimate below is given as a range between those two rates.
+All training and analysis runs on a single RTX 5070 Ti with 16 GB of memory. Measured on this machine on September 1, 2026: 100 TFLOPS bf16 matmul, and a 124M model of the exact architecture in Section 4.1 trains at 80k tokens per second with torch.compile at micro-batch 8, or 3.5 hours per billion tokens, using 7.6 GB. Eager mode runs at 39k. A full training loop adds data loading, Muon's orthogonalization, and checkpointing, so the plan uses a range of 40k to 80k tokens per second, or 3.5 to 7 hours per billion tokens, with the measured figure as the fast end. Every estimate below is given as a range between those two rates.
 
 | Workload | Tokens | GPU hours |
 |---|---|---|
@@ -123,7 +123,7 @@ Three practices make this workable on a personal machine. Every run checkpoints 
 
 The $500 cloud budget is held in reserve. If a pretraining run needs to be redone, or if time allows the 350M scale check, an H100 trains the 124M model in about two hours per run at roughly $6, and the 350M pair for about $25.
 
-Local tooling is PyTorch 2.7 or newer with CUDA 12.8 builds for the Blackwell sm_120 target, run under WSL2 so that torch.compile works.
+The verified stack is native Windows 11 with PyTorch 2.14 (CUDA 13.0 build) and the triton-windows package, which gives a working torch.compile and FlexAttention without WSL2. Flash attention has no kernel in the Windows build, so attention uses the cuDNN backend, which was measured as the fastest available. One Windows-specific constraint shapes the training loop: the driver pages GPU memory into system RAM instead of raising an out-of-memory error, and a micro-batch of 16 ran eleven times slower for that reason. Micro-batch is therefore fixed at 8 with gradient accumulation, and the loop asserts that peak memory stays under 14 GB.
 
 ## 6. Timeline
 
@@ -151,7 +151,7 @@ A complete single-seed result exists at the end of week 4. Weeks 5 and 6 add rep
 - **H3 could fail while H1 and H2 hold.** That outcome would mean spectral rank does not predict LoRA capacity, which is itself a publishable negative result and is reported as such.
 - **Throughput lands at the slow end of the range.** The core still fits in weeks 1 to 4. Second seeds are the first thing cut, and the cloud reserve can absorb any single rerun for about $6.
 - **A long local run is interrupted.** Hourly checkpoints with automatic resume, and a run queue so the card is never idle.
-- **Blackwell tooling on Windows.** WSL2 and current PyTorch builds; verified in week 1 before any run depends on it.
+- **Windows Update restarts a multi-day run.** Active hours leave a 05:00 to 11:00 window for automatic restarts. Updates are paused before each pretraining run, and hourly checkpoints bound the loss to under an hour regardless.
 
 ## 8. Expected contributions
 

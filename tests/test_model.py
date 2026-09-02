@@ -49,6 +49,7 @@ def test_init_scales(tiny_cfg):
     expected = tiny_cfg.init_std / (2 * tiny_cfg.n_layer) ** 0.5
     assert abs(o - expected) < 0.005
 
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
 def test_doc_mask_blocks_cross_document_attention(tiny_cfg):
     """Output for doc 2 with masking must equal running doc 2 alone (up to fp error)."""
     torch.manual_seed(0)
@@ -61,6 +62,7 @@ def test_doc_mask_blocks_cross_document_attention(tiny_cfg):
         alone = m(idx[:, 8:], pos_offset=8)[0]   # same RoPE positions as inside the window
     assert torch.allclose(masked, alone, atol=1e-4), (masked - alone).abs().max()
 
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
 def test_doc_mask_equals_causal_when_single_doc(tiny_cfg):
     torch.manual_seed(0)
     m = Transformer(tiny_cfg).eval()

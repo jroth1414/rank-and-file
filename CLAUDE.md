@@ -227,6 +227,14 @@ Conventions:
   library: LoRA and Muon are implemented here because understanding them is
   the point of the course, and the rubric grades conceptual understanding.
 
+## 6a. Implementation plans
+
+`docs/superpowers/plans/README.md` indexes six self-contained plans, one per
+subsystem, in execution order. Each plan restates the interfaces it consumes
+and produces so an agent can execute it in a fresh context without the
+others. Execute with the superpowers subagent-driven-development or
+executing-plans skill, one task at a time, tests before code, commit per task.
+
 ## 7. Testing
 
 Run `pytest` before any commit that touches `src/`. Required tests:

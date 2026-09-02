@@ -26,3 +26,51 @@ def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor
     if transposed:
         X = X.T
     return X.to(G.dtype)
+
+
+class Muon(torch.optim.Optimizer):
+    def __init__(
+        self,
+        params,
+        lr: float,
+        momentum: float = 0.95,
+        nesterov: bool = True,
+        weight_decay: float = 0.1,
+        ns_steps: int = 5,
+    ):
+        params = list(params)
+        for p in params:
+            if p.ndim != 2:
+                raise ValueError(f"Muon only handles 2-D params, got shape {tuple(p.shape)}")
+        super().__init__(
+            params,
+            dict(
+                lr=lr,
+                momentum=momentum,
+                nesterov=nesterov,
+                weight_decay=weight_decay,
+                ns_steps=ns_steps,
+            ),
+        )
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = closure() if closure is not None else None
+        for group in self.param_groups:
+            lr, mu, wd = group["lr"], group["momentum"], group["weight_decay"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                g = p.grad
+                st = self.state[p]
+                if "momentum_buffer" not in st:
+                    st["momentum_buffer"] = torch.zeros_like(g)
+                buf = st["momentum_buffer"]
+                buf.mul_(mu).add_(g)
+                upd = g.add(buf, alpha=mu) if group["nesterov"] else buf
+                orth_update = zeropower_via_newtonschulz5(upd, group["ns_steps"])
+                orth_update = orth_update * (0.2 * max(p.shape[0], p.shape[1]) ** 0.5)
+                if wd != 0:
+                    p.mul_(1 - lr * wd)
+                p.add_(orth_update, alpha=-lr)
+        return loss

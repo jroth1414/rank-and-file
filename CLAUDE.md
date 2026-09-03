@@ -315,6 +315,13 @@ Append, never rewrite. Format: date, decision, reason.
   to stretch so the core is finishable in weeks 1–4 on one GPU.
 - **2026-09-01** — All compute local on the 5070 Ti by the student's choice;
   cloud budget is a reserve. Second seeds scheduled after the first FT grid.
+- **2026-09-02** — **LoRA alpha = 2·rank, so the adapter scale is 2.0 at every
+  rank.** A fixed alpha across r ∈ {4, 16, 64} would vary the effective
+  update magnitude 16× and make H3's rank curve a learning-rate artifact.
+  Recorded in `results.json` as `alpha`.
+- **2026-09-02** — **Fine-tuning learning rate is swept per (method, task)
+  on P1 s0 only** and reused on every twin: `configs/finetune/{full,lora}_{code,sup}.yaml`.
+  Still never tuned per twin (CLAUDE.md §3 rule 5).
 - **2026-09-02** — **Code fine-tuning corpus is `codeparrot/codeparrot-clean`**
   (field `content`, rows whose `license` is one of mit, apache-2.0,
   bsd-3-clause, bsd-2-clause, isc), built to 100.0M train and 5.0M val

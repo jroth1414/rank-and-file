@@ -14,7 +14,9 @@
 
 - Python 3.11 in `.venv`; run as `.venv\Scripts\python.exe ...`.
 - LoRA targets: `q, k, v, o, gate, up, down` in every block. Embeddings are never adapted.
-- Same fine-tuning hyperparameters across twins for a given method (learning rate swept once on P1 s0, then frozen).
+- **LoRA alpha = 2·rank** (constant scale 2.0 at every rank), per the CLAUDE.md decision log; `FinetuneConfig.alpha=None` means "2·rank".
+- Same fine-tuning hyperparameters across twins for a given (method, task): learning rates live in `configs/finetune/{full,lora}_{code,sup}.yaml`, swept once on P1 s0 (`configs/queue/ft_sweep.txt`, 12 runs), then frozen.
+- The fine-tuning loops carry the same memory guard as pretraining (ceiling raise from step 3, peak reset at step 3, `mem_gib` logged), write `git.txt`, and record `parent_ckpt`, `alpha`, `seed` in `results.json`. Supervised batches are length-bucketed within shuffled mega-batches of 50 batches.
 - Every fine-tune run dir has `config.resolved.yaml`, `results.json`, and either `model.pt` (full) or `lora.pt` (LoRA).
 - Commit prefix `lora:` / `ft:` / `tasks:`; no AI attribution trailers.
 

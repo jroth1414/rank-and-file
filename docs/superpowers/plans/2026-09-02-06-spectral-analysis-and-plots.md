@@ -18,6 +18,13 @@
 - Analysis reads only `runs/`; it never modifies run directories.
 - Commit prefix `spectra:` / `plot:`; no AI attribution trailers.
 
+## Notes from the Plan 5 final review (read before Task 2)
+
+- **LoRA gap reference:** use the full-FT run's `before` metric as the single reference for both numerator and denominator of a (parent, task) cell: `recovered = (lora.after − full.before) / (full.after − full.before)`. Assert that the LoRA run's own `before` agrees with `full.before` within 1e-3 and raise if not (a larger gap means the parent checkpoint changed).
+- LoRA `after` metrics are measured with the adapter applied and unmerged; that is equivalent to merged.
+- `results.json` carries `alpha`, `parent_ckpt`, and `seed`; `alpha = 2·rank` by decision log, so `scale = alpha / rank = 2.0` and `ΔW_lora = (B @ A) * scale` from `lora.pt`'s per-module `scale` field (read the stored value, do not recompute).
+- Fine-tuning configs are `configs/finetune/{full,lora}_{code,sup}.yaml`.
+
 ## Consumed interfaces
 
 - `rankfile.checkpoint.load_model_state(path) -> dict[str, Tensor]`, `read_latest(run_dir)`.

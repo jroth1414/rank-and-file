@@ -10,11 +10,10 @@ from pathlib import Path
 
 import torch
 
-from rankfile.checkpoint import (  # noqa: F401 used in Task 3
+from rankfile.checkpoint import (
     load_checkpoint,
     read_latest,
     save_checkpoint,
-    unwrap,
     write_latest,
 )
 from rankfile.config import (  # noqa: F401 used in Task 3
@@ -23,15 +22,15 @@ from rankfile.config import (  # noqa: F401 used in Task 3
     load_yaml,
     to_yaml,
 )
-from rankfile.data import (  # noqa: F401 used in Task 3
+from rankfile.data import (
     FixedOrderSampler,
     TokenStream,
     list_shards,
     make_batch,
 )
-from rankfile.model import ModelConfig, Transformer, doc_block_mask  # noqa: F401 used in Task 3
-from rankfile.optim.build import build_optimizers, set_lr  # noqa: F401 used in Task 3
-from rankfile.schedule import wsd_lr  # noqa: F401 used in Task 3
+from rankfile.model import ModelConfig, Transformer, doc_block_mask
+from rankfile.optim.build import build_optimizers, set_lr
+from rankfile.schedule import wsd_lr
 
 
 @dataclass
@@ -120,3 +119,144 @@ def evaluate(
             total += loss_fn(x, y, block_mask=bm).item()
         count += 1
     return total / max(1, count)
+
+
+def _permanent(tokens_seen: int, cfg: TrainConfig) -> bool:
+    return cfg.keep_every_tokens > 0 and tokens_seen % cfg.keep_every_tokens == 0
+
+
+def _rotate_checkpoints(run: Path, cfg: TrainConfig, keep_recent: int = 2) -> None:
+    ckpts = sorted(run.glob("ckpt_*.pt"))
+    temp = [p for p in ckpts if not _permanent(int(p.stem.split("_")[1]) * cfg.batch_tokens, cfg)]
+    for p in temp[:-keep_recent]:
+        p.unlink()
+
+
+def _save(
+    run: Path,
+    cfg: TrainConfig,
+    model,
+    opts,
+    step: int,
+    position: int,
+    tokens_seen: int,
+    data_total_tokens: int,
+) -> None:
+    name = f"ckpt_{step:07d}.pt"
+    extra = {
+        "arm": cfg.arm,
+        "optimizer": cfg.optimizer,
+        "total_tokens": data_total_tokens,
+        "seed": cfg.seed,
+        "seq_len": cfg.seq_len,
+    }
+    save_checkpoint(run / name, model, opts, step, position, tokens_seen, extra)
+    write_latest(run, name)
+    _rotate_checkpoints(run, cfg)
+
+
+def train(
+    cfg: TrainConfig,
+    model_cfg: ModelConfig,
+    device: str | None = None,
+    max_steps: int | None = None,
+) -> Path:
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    on_cuda = str(device).startswith("cuda")
+    d = derived(cfg)
+    run = init_run_dir(cfg, model_cfg)
+    log = MetricsLog(run)
+    torch.manual_seed(cfg.seed)
+    model = Transformer(model_cfg).to(device)
+    opts = build_optimizers(
+        model, cfg.optimizer, cfg.peak_lr, cfg.weight_decay, (cfg.beta1, cfg.beta2)
+    )
+    train_stream = TokenStream(list_shards(cfg.data_dir, "train"))
+    val_stream = TokenStream(list_shards(cfg.data_dir, "val"))
+    sampler = FixedOrderSampler(train_stream.total_tokens, cfg.seq_len, cfg.seed)
+    step, position, tokens_seen = 0, 0, 0
+    latest = read_latest(run)
+    if latest is not None and latest.exists():
+        meta = load_checkpoint(latest, model, opts)
+        extra = meta["extra"]
+        live = {
+            "total_tokens": train_stream.total_tokens,
+            "seed": cfg.seed,
+            "seq_len": cfg.seq_len,
+        }
+        for field, live_value in live.items():
+            ckpt_value = extra.get(field)
+            if ckpt_value != live_value:
+                raise RuntimeError(
+                    f"data provenance mismatch on {field!r}: checkpoint has "
+                    f"{ckpt_value!r}, live config/data has {live_value!r}"
+                )
+        step, position, tokens_seen = meta["step"], meta["position"], meta["tokens_seen"]
+        log.write(event="resume", step=step, tokens=tokens_seen, ckpt=latest.name)
+    loss_fn = torch.compile(model.loss, dynamic=False) if (cfg.compile and on_cuda) else model.loss
+    total, nonemb = model.num_params()
+    log.write(
+        event="start", params=total, non_embedding=nonemb, steps_total=d["steps_total"],
+        accum=d["accum"], device=str(device),
+    )
+    last_ckpt_time = time.time()
+    next_eval = ((tokens_seen // cfg.eval_every_tokens) + 1) * cfg.eval_every_tokens
+    t_log = time.time()
+    stop_at = d["steps_total"] if max_steps is None else min(d["steps_total"], step + max_steps)
+    while step < stop_at:
+        lr = wsd_lr(step, d["steps_total"], cfg.peak_lr, cfg.warmup_frac, cfg.decay_frac)
+        set_lr(opts, lr)
+        loss_acc = torch.zeros((), device=device)
+        for _ in range(d["accum"]):
+            x, y, dids = make_batch(
+                train_stream, sampler, position, cfg.micro_batch, cfg.seq_len, device
+            )
+            position += cfg.micro_batch
+            # FlexAttention (which doc masking requires) has no CPU backward in this
+            # torch build; real training is always CUDA (CLAUDE.md hardware), so gate
+            # doc masking on the training loop's own device rather than skip it there.
+            bm = doc_block_mask(dids) if (cfg.use_doc_mask and on_cuda) else None
+            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=on_cuda):
+                loss = loss_fn(x, y, block_mask=bm) / d["accum"]
+            loss.backward()
+            loss_acc += loss.detach()
+        gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+        for o in opts:
+            o.step()
+        for o in opts:
+            o.zero_grad(set_to_none=True)
+        step += 1
+        tokens_seen += cfg.batch_tokens
+        if step % cfg.log_every_steps == 0 or step == 1:
+            now = time.time()
+            mem = torch.cuda.max_memory_allocated() / 2**30 if on_cuda else 0.0
+            log.write(
+                step=step, tokens=tokens_seen, loss=loss_acc.item(), lr=lr, grad_norm=float(gnorm),
+                tok_per_s=cfg.batch_tokens * cfg.log_every_steps / max(1e-9, now - t_log),
+                mem_gib=mem,
+            )
+            t_log = now
+            if on_cuda and step >= 3 and mem > cfg.mem_ceiling_gib:
+                raise RuntimeError(
+                    f"peak memory {mem:.1f} GiB exceeds ceiling {cfg.mem_ceiling_gib}; "
+                    "WDDM would page to RAM"
+                )
+        if tokens_seen >= next_eval:
+            vl = evaluate(
+                loss_fn, val_stream, cfg.seq_len, cfg.micro_batch, cfg.eval_windows, device,
+                cfg.use_doc_mask,
+            )
+            log.write(step=step, tokens=tokens_seen, val_loss=vl)
+            next_eval += cfg.eval_every_tokens
+        due = (time.time() - last_ckpt_time) / 60 >= cfg.ckpt_every_minutes
+        if due or _permanent(tokens_seen, cfg) or step == stop_at:
+            _save(run, cfg, model, opts, step, position, tokens_seen, train_stream.total_tokens)
+            last_ckpt_time = time.time()
+    if step >= d["steps_total"]:
+        vl = evaluate(
+            loss_fn, val_stream, cfg.seq_len, cfg.micro_batch, cfg.eval_windows, device,
+            cfg.use_doc_mask,
+        )
+        log.write(step=step, tokens=tokens_seen, val_loss=vl, event="final")
+        (run / "DONE").write_text(f"{step} {tokens_seen} {vl:.6f}\n", encoding="utf-8")
+    return run

@@ -6,6 +6,7 @@ from rankfile.spectra import (
     singular_values,
     stable_rank,
     subspace_overlap,
+    subspace_overlap_two_sided,
     top_r_energy,
 )
 
@@ -36,6 +37,13 @@ def test_matrix_report_parses_names():
     r = matrix_report("blocks.3.mlp.down.weight", torch.randn(32, 64))
     assert r["layer"] == 3 and r["module"] == "mlp.down" and r["rows"] == 32 and r["cols"] == 64
     assert 1.0 <= r["erank"] <= 32 and 0 < r["top4"] <= r["top16"] <= 1.0
+
+
+def test_matrix_report_erank_norm():
+    r = matrix_report("blocks.0.attn.q.weight", torch.eye(10))
+    assert abs(r["erank_norm"] - 1.0) < 1e-4
+    r2 = matrix_report("blocks.0.mlp.down.weight", torch.randn(20, 5))
+    assert abs(r2["erank_norm"] - r2["erank"] / 5) < 1e-9
 
 
 def test_effective_rank_zero_matrix():
@@ -72,3 +80,41 @@ def test_subspace_overlap_rank_deficient_B():
     overlap_single = subspace_overlap(delta, B_single)
     overlap_dup = subspace_overlap(delta, B_dup)
     assert abs(overlap_single - overlap_dup) < 1e-5
+
+
+def test_subspace_overlap_two_sided_equals_top_r_energy_for_top_singular_vectors():
+    """When B/A span the top-r left/right singular vectors of delta, the two-sided
+    overlap equals the top-r energy fraction of delta."""
+    torch.manual_seed(0)
+    m, n, r = 20, 15, 3
+    delta = torch.randn(m, n)
+    U, S, Vh = torch.linalg.svd(delta, full_matrices=False)
+    B = U[:, :r]
+    A = Vh[:r, :]
+    got = subspace_overlap_two_sided(delta, B, A)
+    want = top_r_energy(S, r)
+    assert abs(got - want) < 1e-4
+
+
+def test_subspace_overlap_two_sided_random_is_small_and_below_chance():
+    """For random B, A of rank r against an independent random delta, the two-sided
+    overlap is small: it lands well under the r/min(m, n) chance baseline used for
+    the CSV column (the true expectation, r^2/(m*n), is even smaller since the
+    projection is constrained on both sides at once)."""
+    torch.manual_seed(0)
+    m, n, r = 40, 30, 4
+    delta = torch.randn(m, n)
+    B = torch.randn(m, r)
+    A = torch.randn(r, n)
+    got = subspace_overlap_two_sided(delta, B, A)
+    chance = r / min(m, n)
+    assert 0.0 < got < chance
+
+
+def test_subspace_overlap_two_sided_zero_cases():
+    delta = torch.randn(10, 6)
+    B = torch.randn(10, 2)
+    A = torch.randn(2, 6)
+    assert subspace_overlap_two_sided(torch.zeros(10, 6), B, A) == 0.0
+    assert subspace_overlap_two_sided(delta, torch.zeros(10, 2), A) == 0.0
+    assert subspace_overlap_two_sided(delta, B, torch.zeros(2, 6)) == 0.0

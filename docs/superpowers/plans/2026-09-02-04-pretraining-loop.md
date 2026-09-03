@@ -416,7 +416,15 @@ Expected: 3 FAIL with `ImportError: train`
 
 ```python
 def _permanent(tokens_seen: int, cfg: TrainConfig) -> bool:
-    return cfg.keep_every_tokens > 0 and tokens_seen % cfg.keep_every_tokens == 0
+    """True on the step that crosses a keep_every_tokens boundary.
+
+    A modulus test would never fire: tokens_seen is a multiple of batch_tokens = 2^19 and
+    gcd(2^19, 250M) = 128, so `tokens_seen % 250M == 0` needs step % 1,953,125 == 0.
+    """
+    if cfg.keep_every_tokens <= 0:
+        return False
+    prev = tokens_seen - cfg.batch_tokens
+    return tokens_seen // cfg.keep_every_tokens > prev // cfg.keep_every_tokens
 
 
 def _rotate_checkpoints(run: Path, cfg: TrainConfig, keep_recent: int = 2) -> None:
@@ -813,9 +821,14 @@ Queue files (the python path is the venv's):
 ```
 
 ```
-# configs/queue/core.txt — P1 s0, P2 s0, P3. Set peak_lr in adamw.yaml/muon.yaml to the sweep winners first.
+# configs/queue/core.txt — P1 s0, P2 s0. Set peak_lr in adamw.yaml/muon.yaml to the sweep winners first.
+# P3 runs from core_p3.txt after its total_tokens is set from P2's final val_loss (Task 7 Step 5).
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/adamw.yaml --seed 0 --name p1_adamw_m124_s0
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/muon.yaml --seed 0 --name p2_muon_m124_s0
+```
+
+```
+# configs/queue/core_p3.txt — P3 only. Set total_tokens in p3_adamw.yaml first (Task 7 Step 5).
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/p3_adamw.yaml --seed 0 --name p3_adamw_m124_s0
 ```
 
@@ -842,8 +855,9 @@ git commit -m "train: sequential run queue with DONE skipping and one retry; swe
 
 - [ ] **Step 1:** Confirm with the user that `pytest` passes, the smoke test passed, and `data/fineweb_edu` is built (Plan 2 Task 4).
 - [ ] **Step 2:** Ask: "Launch the learning-rate sweep queue? Six runs of 200M tokens, roughly 5 to 8 hours total on the 5070 Ti. Pause Windows Update first."
-- [ ] **Step 3:** On approval: `.venv\Scripts\python.exe scripts/queue.py configs/queue/sweep.txt`. When done, read each run's final `val_loss` from `DONE`, pick the best `peak_lr` per optimizer, write them into `adamw.yaml`, `muon.yaml`, `p3_adamw.yaml`, and add a decision-log line in `CLAUDE.md` §11.
-- [ ] **Step 4:** Ask: "Launch the core queue? P1, P2, P3 back to back, roughly 30 to 60 hours." On approval run `configs/queue/core.txt`.
+- [ ] **Step 3:** On approval: `.venv\Scripts\python.exe scripts/queue.py configs/queue/sweep.txt` (six runs of ~200M tokens, ~35 min each at the measured 95k tok/s, so ~4 h). When done, read each run's final `val_loss` from `DONE` and pick the best `peak_lr` per optimizer. **Edge rule:** if either optimizer's best is at a grid endpoint (1e-3 or 4e-3), add one point beyond it (5e-4 or 8e-3) and rerun that single point before freezing. Write the winners into `adamw.yaml`, `muon.yaml`, `p3_adamw.yaml`, and add a decision-log line in `CLAUDE.md` §11.
+- [ ] **Step 4:** Ask: "Launch the core queue? P1 then P2 back to back, roughly 16 to 17 hours." On approval run `configs/queue/core.txt` (P1 and P2 only).
+- [ ] **Step 5:** After P2 finishes, read P2's final `val_loss` from its `DONE` file and P1's loss curve from `metrics.jsonl`. Choose P3's `total_tokens` so that an annealed AdamW run is expected to land at P2's final loss (extrapolate P1's stable-phase curve and add P1's measured anneal drop; 3.75B is the prior). Write it into `p3_adamw.yaml` (replacing the placeholder), add a decision-log line, then ask: "Launch P3? Roughly 11 to 13 hours." On approval run `configs/queue/core_p3.txt`. The sound comparison is P3-final versus P2-final, both annealed; intermediate P3 checkpoints sit at stable-phase LR and are not matched-loss substitutes.
 
 ---
 

@@ -55,6 +55,11 @@ class Muon(torch.optim.Optimizer):
     ):
         params = list(params)
         for p in params:
+            if isinstance(p, dict):
+                raise ValueError(
+                    "Muon does not support param groups (dicts); "
+                    "pass a flat list of parameters"
+                )
             if not isinstance(p, torch.Tensor) or p.ndim != 2:
                 raise ValueError(f"Muon only handles 2-D params, got shape {tuple(p.shape)}")
         super().__init__(

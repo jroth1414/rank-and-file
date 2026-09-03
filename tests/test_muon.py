@@ -77,3 +77,8 @@ def test_muon_update_is_invariant_to_gradient_scale():
         opt1.step()
         opt2.step()
     assert torch.equal(p1, p2)
+
+
+def test_muon_rejects_param_group_dicts():
+    with pytest.raises(ValueError):
+        Muon([{"params": [torch.nn.Parameter(torch.zeros(4, 4))]}], lr=0.1)

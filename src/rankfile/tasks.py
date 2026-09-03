@@ -29,6 +29,11 @@ def _trunc(s: str, n: int = 1500) -> str:
     return s if len(s) <= n else s[:n]
 
 
+# Over all 17,553 cached examples (load_sup_split, all three tasks, train + eval),
+# encode_sup's max_len=512 truncation trims exactly one BoolQ row (max encoded length
+# 547 tokens), so it is practically inert.
+
+
 def _sst2_template(r: dict) -> str:
     return f"Review: {_trunc(r['sentence']).strip()}\nSentiment:"
 

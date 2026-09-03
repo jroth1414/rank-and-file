@@ -13,12 +13,18 @@ def singular_values(W: torch.Tensor) -> torch.Tensor:
 
 
 def effective_rank(s: torch.Tensor) -> float:
+    """Entropy of normalized spectrum. Returns 0.0 if no positive singular value exists."""
     s = s[s > 0]
+    if len(s) == 0:
+        return 0.0
     p = s / s.sum()
     return float(torch.exp(-(p * p.log()).sum()))
 
 
 def stable_rank(s: torch.Tensor) -> float:
+    """Frobenius/spectral norm squared ratio. Returns 0.0 if s[0] == 0."""
+    if len(s) == 0 or s[0] == 0:
+        return 0.0
     return float((s * s).sum() / (s[0] * s[0]))
 
 
@@ -28,10 +34,21 @@ def top_r_energy(s: torch.Tensor, r: int) -> float:
 
 
 def subspace_overlap(delta: torch.Tensor, B: torch.Tensor) -> float:
+    """Fraction of ‖delta‖_F² captured by projection onto colspace(B) via SVD basis.
+    Returns 0.0 if delta is zero, B is zero, or B is rank-deficient beyond tolerance."""
     delta, B = delta.detach().float().cpu(), B.detach().float().cpu()
-    Q, _ = torch.linalg.qr(B)                       # orthonormal basis of colspace(B)
-    proj = Q @ (Q.T @ delta)
-    return float((proj * proj).sum() / (delta * delta).sum())
+    delta_norm_sq = (delta * delta).sum()
+    if delta_norm_sq == 0:
+        return 0.0
+    U, S, _ = torch.linalg.svd(B, full_matrices=False)
+    if S.max() == 0:
+        return 0.0
+    mask = S > 1e-6 * S.max()
+    if not mask.any():
+        return 0.0
+    U_basis = U[:, mask]
+    proj = U_basis @ (U_basis.T @ delta)
+    return float((proj * proj).sum() / delta_norm_sq)
 
 
 def matrix_report(name: str, W: torch.Tensor, ranks: tuple[int, ...] = (4, 16, 64)) -> dict:

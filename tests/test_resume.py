@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pytest
 import torch
 
 from rankfile.data import write_shard
@@ -37,9 +38,28 @@ def test_resume_rejects_changed_data_provenance(tmp_path):
     run = train(tc, mc, device="cpu", max_steps=5)
     assert not (run / "DONE").exists()
     write_shard(np.zeros(500, dtype=np.uint16), tmp_path / "train_0001.bin")
-    try:
+    with pytest.raises(RuntimeError, match="provenance"):
         train(tc, mc, device="cpu")
-        raised = False
-    except RuntimeError:
-        raised = True
-    assert raised
+
+
+def test_resume_rejects_changed_peak_lr(tmp_path):
+    _tiny_data(tmp_path)
+    mc, tc = _tiny_cfgs(tmp_path)
+    tc.name = "peak_lr_provenance"
+    run = train(tc, mc, device="cpu", max_steps=5)
+    assert not (run / "DONE").exists()
+    tc.peak_lr = tc.peak_lr * 2
+    with pytest.raises(RuntimeError, match="provenance"):
+        train(tc, mc, device="cpu")
+
+
+def test_train_refuses_restart_when_latest_missing_but_checkpoints_exist(tmp_path):
+    _tiny_data(tmp_path)
+    mc, tc = _tiny_cfgs(tmp_path)
+    tc.name = "orphaned_latest"
+    run = train(tc, mc, device="cpu", max_steps=5)
+    assert not (run / "DONE").exists()
+    assert list(run.glob("ckpt_*.pt"))
+    (run / "latest.txt").unlink()
+    with pytest.raises(RuntimeError, match="refusing to restart"):
+        train(tc, mc, device="cpu")

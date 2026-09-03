@@ -16,7 +16,7 @@ from rankfile.checkpoint import (
     save_checkpoint,
     write_latest,
 )
-from rankfile.config import (  # noqa: F401 used in Task 3
+from rankfile.config import (
     apply_overrides,
     from_dict,
     load_yaml,
@@ -55,6 +55,7 @@ class TrainConfig:
     eval_windows: int = 512        # 512 windows x 2048 = 1M val tokens
     ckpt_every_minutes: float = 60.0
     keep_every_tokens: int = 250_000_000   # permanent checkpoints for later analysis
+    adamw_lr_scale: float = 1.0
     compile: bool = True
     use_doc_mask: bool = True
     mem_ceiling_gib: float = 14.0
@@ -81,9 +82,16 @@ def _git_hash() -> str:
 def init_run_dir(cfg: TrainConfig, model_cfg: ModelConfig) -> Path:
     run = Path(cfg.out_root) / cfg.name
     run.mkdir(parents=True, exist_ok=True)
-    to_yaml(cfg, run / "config.resolved.yaml")
-    to_yaml(model_cfg, run / "model.yaml")
-    (run / "git.txt").write_text(_git_hash() + "\n", encoding="utf-8")
+    resolved = run / "config.resolved.yaml"
+    if not resolved.exists():
+        to_yaml(cfg, resolved)
+    model_yaml = run / "model.yaml"
+    if not model_yaml.exists():
+        to_yaml(model_cfg, model_yaml)
+    # Append rather than overwrite so a resume records the git hash it resumed under
+    # alongside the one that started the run, instead of erasing that history.
+    with open(run / "git.txt", "a", encoding="utf-8") as f:
+        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {_git_hash()}\n")
     return run
 
 
@@ -122,10 +130,22 @@ def evaluate(
 
 
 def _permanent(tokens_seen: int, cfg: TrainConfig) -> bool:
-    return cfg.keep_every_tokens > 0 and tokens_seen % cfg.keep_every_tokens == 0
+    """True iff this step's tokens_seen crosses a keep_every_tokens boundary.
+
+    A modulus check (tokens_seen % keep_every_tokens == 0) only fires when
+    keep_every_tokens divides batch_tokens exactly, which is not the case for
+    the real configs (524288 does not divide 250_000_000); this boundary-
+    crossing test fires exactly once per boundary regardless of divisibility.
+    """
+    if cfg.keep_every_tokens <= 0:
+        return False
+    prev = tokens_seen - cfg.batch_tokens
+    return tokens_seen // cfg.keep_every_tokens > prev // cfg.keep_every_tokens
 
 
 def _rotate_checkpoints(run: Path, cfg: TrainConfig, keep_recent: int = 2) -> None:
+    for p in run.glob("ckpt_*.tmp"):
+        p.unlink()
     ckpts = sorted(run.glob("ckpt_*.pt"))
     temp = [p for p in ckpts if not _permanent(int(p.stem.split("_")[1]) * cfg.batch_tokens, cfg)]
     for p in temp[:-keep_recent]:
@@ -149,6 +169,13 @@ def _save(
         "total_tokens": data_total_tokens,
         "seed": cfg.seed,
         "seq_len": cfg.seq_len,
+        "peak_lr": cfg.peak_lr,
+        # distinct from data_total_tokens/total_tokens above (the data stream's
+        # token count): this is the training budget from TrainConfig.
+        "train_total_tokens": cfg.total_tokens,
+        "batch_tokens": cfg.batch_tokens,
+        "warmup_frac": cfg.warmup_frac,
+        "decay_frac": cfg.decay_frac,
     }
     save_checkpoint(run / name, model, opts, step, position, tokens_seen, extra)
     write_latest(run, name)
@@ -169,7 +196,8 @@ def train(
     torch.manual_seed(cfg.seed)
     model = Transformer(model_cfg).to(device)
     opts = build_optimizers(
-        model, cfg.optimizer, cfg.peak_lr, cfg.weight_decay, (cfg.beta1, cfg.beta2)
+        model, cfg.optimizer, cfg.peak_lr, cfg.weight_decay, (cfg.beta1, cfg.beta2),
+        adamw_lr_scale=cfg.adamw_lr_scale,
     )
     train_stream = TokenStream(list_shards(cfg.data_dir, "train"))
     val_stream = TokenStream(list_shards(cfg.data_dir, "val"))
@@ -180,19 +208,29 @@ def train(
         meta = load_checkpoint(latest, model, opts)
         extra = meta["extra"]
         live = {
+            "arm": cfg.arm,
             "total_tokens": train_stream.total_tokens,
             "seed": cfg.seed,
             "seq_len": cfg.seq_len,
+            "peak_lr": cfg.peak_lr,
+            "train_total_tokens": cfg.total_tokens,
+            "batch_tokens": cfg.batch_tokens,
+            "warmup_frac": cfg.warmup_frac,
+            "decay_frac": cfg.decay_frac,
         }
         for field, live_value in live.items():
             ckpt_value = extra.get(field)
             if ckpt_value != live_value:
                 raise RuntimeError(
-                    f"data provenance mismatch on {field!r}: checkpoint has "
+                    f"provenance mismatch on {field!r}: checkpoint has "
                     f"{ckpt_value!r}, live config/data has {live_value!r}"
                 )
         step, position, tokens_seen = meta["step"], meta["position"], meta["tokens_seen"]
         log.write(event="resume", step=step, tokens=tokens_seen, ckpt=latest.name)
+    elif list(run.glob("ckpt_*.pt")):
+        raise RuntimeError(
+            f"{run} has checkpoints but no usable latest.txt; refusing to restart from step 0"
+        )
     loss_fn = torch.compile(model.loss, dynamic=False) if (cfg.compile and on_cuda) else model.loss
     total, nonemb = model.num_params()
     log.write(
@@ -236,13 +274,18 @@ def train(
                 f"peak memory {mem:.1f} GiB exceeds ceiling {cfg.mem_ceiling_gib}; "
                 "WDDM would page to RAM"
             )
+        if on_cuda and step == 3:
+            # First two steps include one-time compile transients that would
+            # otherwise sit in the monotone peak for the rest of the run.
+            torch.cuda.reset_peak_memory_stats()
         if step % cfg.log_every_steps == 0 or step == 1:
             now = time.time()
             steps_elapsed = step - log_step_start
+            mem_reserved = torch.cuda.max_memory_reserved() / 2**30 if on_cuda else 0.0
             log.write(
                 step=step, tokens=tokens_seen, loss=loss_acc.item(), lr=lr, grad_norm=float(gnorm),
                 tok_per_s=cfg.batch_tokens * steps_elapsed / max(1e-9, now - t_log),
-                mem_gib=mem,
+                mem_gib=mem, mem_reserved_gib=mem_reserved,
             )
             t_log = now
             log_step_start = step

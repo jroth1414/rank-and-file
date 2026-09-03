@@ -59,6 +59,15 @@ def test_latest_pointer(tmp_path):
     assert read_latest(tmp_path) == tmp_path / "ckpt_0000005.pt"
 
 
+def test_write_latest_is_atomic_and_leaves_no_tmp(tmp_path):
+    write_latest(tmp_path, "ckpt_0000005.pt")
+    assert not (tmp_path / "latest.tmp").exists()
+    assert (tmp_path / "latest.txt").read_text(encoding="utf-8") == "ckpt_0000005.pt"
+    write_latest(tmp_path, "ckpt_0000009.pt")  # overwrite path also leaves no .tmp
+    assert not (tmp_path / "latest.tmp").exists()
+    assert read_latest(tmp_path) == tmp_path / "ckpt_0000009.pt"
+
+
 def test_load_model_state_only(tmp_path):
     m, opts = _mk()
     p = tmp_path / "c.pt"

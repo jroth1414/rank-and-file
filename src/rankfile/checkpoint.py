@@ -66,7 +66,10 @@ def load_model_state(path: str | Path) -> dict[str, torch.Tensor]:
 
 
 def write_latest(run_dir: str | Path, ckpt_name: str) -> None:
-    (Path(run_dir) / "latest.txt").write_text(ckpt_name, encoding="utf-8")
+    p = Path(run_dir) / "latest.txt"
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(ckpt_name, encoding="utf-8")
+    tmp.replace(p)  # atomic on the same volume
 
 
 def read_latest(run_dir: str | Path) -> Path | None:

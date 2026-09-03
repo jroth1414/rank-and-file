@@ -315,6 +315,16 @@ Append, never rewrite. Format: date, decision, reason.
   to stretch so the core is finishable in weeks 1–4 on one GPU.
 - **2026-09-01** — All compute local on the 5070 Ti by the student's choice;
   cloud budget is a reserve. Second seeds scheduled after the first FT grid.
+- **2026-09-03** — **Analysis conventions.** Only arms P1/P2/P3 and canonically
+  named fine-tune runs enter the paper's CSVs (sweeps are excluded by
+  `scripts/analyze.py`). Tables never pool across arms; H1 is read as P2
+  vs P3 at their (adjacent-row) validation losses. Subspace overlap is
+  reported one-sided (chance baseline `r/rows`) and two-sided (chance
+  baseline `r²/(rows·cols)`).
+  Effective rank is Roy–Vetterli on unsquared singular values; top-r energy
+  is the squared (Frobenius) fraction; both are also reported normalised by
+  `min(rows, cols)` when shapes are pooled. The intermediate-checkpoint
+  effective-rank-vs-loss trajectory (`--all-ckpts`) is the primary H1 figure.
 - **2026-09-02** — **LoRA alpha = 2·rank, so the adapter scale is 2.0 at every
   rank.** A fixed alpha across r ∈ {4, 16, 64} would vary the effective
   update magnitude 16× and make H3's rank curve a learning-rate artifact.

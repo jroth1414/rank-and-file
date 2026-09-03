@@ -25,6 +25,17 @@
 - `results.json` carries `alpha`, `parent_ckpt`, and `seed`; `alpha = 2·rank` by decision log, so `scale = alpha / rank = 2.0` and `ΔW_lora = (B @ A) * scale` from `lora.pt`'s per-module `scale` field (read the stored value, do not recompute).
 - Fine-tuning configs are `configs/finetune/{full,lora}_{code,sup}.yaml`.
 
+## Amendments from the Plan 6 final review (binding)
+
+- `analyze.py` includes only pretraining runs whose `arm` is in `{p1, p2, p3}` (override `--arms`) and only fine-tune runs named `{parent}__{full|lora r}_{task}` whose parent is included (override `--include`); duplicate cells raise. Sweep runs never enter the paper's CSVs.
+- Every CSV carries `optimizer`, `arm`, `seed`, and (fine-tune) `lr`; `plot.py` reads them and never infers the optimizer from a run name.
+- Overlap is reported both one-sided (`colspace(B)`, chance baseline `r / rows`) and two-sided (`P_B Δ P_A`, chance baseline `r² / (rows·cols)`); `fig_overlap` plots the measured values against both baselines.
+- `erank_norm = erank / min(rows, cols)` is used wherever matrices of different shapes are pooled.
+- Before-mismatch between a LoRA run and its full-FT reference: column `before_mismatch`; warn > 1e-3; raise > 1e-2 unless `--allow-before-mismatch`. `recovered` is NaN when full FT did not improve.
+- Tables never pool across arms: H1 is one row per run with `val_loss`; the matched-loss comparison is P2 vs P3 read off adjacent rows.
+- `--all-ckpts` writes `pretrained_spectra_traj.csv` (permanent checkpoints joined to the nearest earlier `val_loss`) and `fig_erank_vs_loss` plots effective rank against loss per arm, the strongest form of H1.
+- Figure conventions: colour = optimizer (`adamw #0072B2`, `muon #E69F00`), linestyle = arm (P3 dashed), marker = seed; rank axes read 4/16/64; the mechanism scatter reports Spearman ρ and has no y = x line.
+
 ## Consumed interfaces
 
 - `rankfile.checkpoint.load_model_state(path) -> dict[str, Tensor]`, `read_latest(run_dir)`.

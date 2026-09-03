@@ -1,0 +1,6 @@
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --lr 3e-5 --name ftsweep_full_lr3e-5
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --lr 1e-4 --name ftsweep_full_lr1e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --lr 3e-4 --name ftsweep_full_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 3e-4 --name ftsweep_lora16_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 1e-3 --name ftsweep_lora16_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 3e-3 --name ftsweep_lora16_lr3e-3

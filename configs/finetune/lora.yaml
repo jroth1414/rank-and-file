@@ -1,0 +1,3 @@
+lr: 1.0e-3
+alpha: 32.0
+weight_decay: 0.0

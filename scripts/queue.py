@@ -34,7 +34,7 @@ def run_queue(queue_file: Path, runs_root: Path = Path("runs")) -> dict[str, str
             if not line or line.startswith("#"):
                 continue
             name = _name(line)
-            if (runs_root / name / "DONE").exists():
+            if (runs_root / name / "DONE").exists() or (runs_root / name / "results.json").exists():
                 log(f"skip {name}: DONE exists"); summary[name] = "skipped"; continue
             status = "failed"
             for attempt in (1, 2):

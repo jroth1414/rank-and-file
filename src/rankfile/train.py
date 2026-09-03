@@ -1,7 +1,7 @@
 """Pretraining loop: gradient accumulation, WSD schedule, eval, resumable checkpoints, compile."""
 from __future__ import annotations
 
-import argparse  # noqa: F401 used in Task 3
+import argparse
 import json
 import subprocess
 import time
@@ -265,3 +265,29 @@ def train(
         log.write(step=step, tokens=tokens_seen, val_loss=vl, event="final")
         (run / "DONE").write_text(f"{step} {tokens_seen} {vl:.6f}\n", encoding="utf-8")
     return run
+
+
+def main() -> Path:
+    ap = argparse.ArgumentParser(description="rank-and-file pretraining")
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--train", required=True)
+    ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--name", default=None)
+    ap.add_argument("--set", action="append", default=[], help="override train config key=value")
+    ap.add_argument("--max-steps", type=int, default=None)
+    ap.add_argument("--device", default=None)
+    a = ap.parse_args()
+    model_cfg = from_dict(ModelConfig, load_yaml(a.model))
+    td = apply_overrides(load_yaml(a.train), a.set)
+    cfg = from_dict(TrainConfig, td)
+    if a.seed is not None:
+        cfg.seed = a.seed
+    if a.name:
+        cfg.name = a.name
+    if not cfg.name:
+        cfg.name = f"{cfg.arm}_{cfg.optimizer}_{Path(a.model).stem}_s{cfg.seed}"
+    return train(cfg, model_cfg, device=a.device, max_steps=a.max_steps)
+
+
+if __name__ == "__main__":
+    main()

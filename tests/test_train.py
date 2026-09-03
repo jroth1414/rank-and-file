@@ -61,3 +61,16 @@ def test_muon_arm_trains(tmp_path):
     mc, tc = _tiny_cfgs(tmp_path, optimizer="muon")
     run = train(tc, mc, device="cpu")
     assert (run / "DONE").exists()
+
+def test_cli_builds_name_and_runs(tmp_path, monkeypatch):
+    import sys
+
+    from rankfile.config import to_yaml
+    from rankfile.train import main
+    _tiny_data(tmp_path)
+    mc, tc = _tiny_cfgs(tmp_path); tc.name = ""
+    to_yaml(mc, tmp_path / "m30.yaml"); to_yaml(tc, tmp_path / "adamw.yaml")
+    monkeypatch.setattr(sys, "argv", ["train", "--model", str(tmp_path / "m30.yaml"), "--train", str(tmp_path / "adamw.yaml"),
+                                      "--seed", "1", "--device", "cpu", "--max-steps", "2", "--set", "log_every_steps=1"])
+    run = main()
+    assert run.name == "p1_adamw_m30_s1" and (run / "metrics.jsonl").exists()

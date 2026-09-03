@@ -1,0 +1,4 @@
+# configs/queue/core.txt — P1 s0, P2 s0, P3. Set peak_lr in adamw.yaml/muon.yaml to the sweep winners first.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/adamw.yaml --seed 0 --name p1_adamw_m124_s0
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/muon.yaml --seed 0 --name p2_muon_m124_s0
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/p3_adamw.yaml --seed 0 --name p3_adamw_m124_s0

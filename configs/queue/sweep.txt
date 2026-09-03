@@ -1,0 +1,7 @@
+# configs/queue/sweep.txt — 6 x 200M tokens, ~1 h each at 60k tok/s. Ask the user before launching.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr1e-3 --set peak_lr=1e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr2e-3 --set peak_lr=2e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr4e-3 --set peak_lr=4e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr1e-3 --set peak_lr=1e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr2e-3 --set peak_lr=2e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr4e-3 --set peak_lr=4e-3

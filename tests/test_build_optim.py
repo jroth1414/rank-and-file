@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from rankfile.model import ModelConfig, Transformer
@@ -44,3 +45,31 @@ def test_set_lr_applies_everywhere():
     opts = build_optimizers(_model(), "muon", lr=1e-3, weight_decay=0.1)
     set_lr(opts, 5e-4)
     assert all(g["lr"] == 5e-4 for o in opts for g in o.param_groups)
+
+
+def test_set_lr_respects_per_group_adamw_scale():
+    opts = build_optimizers(_model(), "muon", lr=1e-3, weight_decay=0.1, adamw_lr_scale=0.5)
+    set_lr(opts, 2e-3)
+    muon_opt, adamw_opt = opts
+    assert all(g["lr"] == 2e-3 for g in muon_opt.param_groups)
+    assert all(g["lr"] == 1e-3 for g in adamw_opt.param_groups)
+
+
+def test_both_arms_decay_the_same_parameters():
+    m = _model()
+
+    def decayed(arm):
+        return {
+            id(p)
+            for o in build_optimizers(m, arm, lr=1e-3, weight_decay=0.1)
+            for g in o.param_groups
+            if g["weight_decay"] != 0.0
+            for p in g["params"]
+        }
+
+    assert decayed("adamw") == decayed("muon")
+
+
+def test_build_optimizers_rejects_unknown_arm():
+    with pytest.raises(ValueError):
+        build_optimizers(_model(), "sgd", lr=1e-3, weight_decay=0.1)

@@ -27,7 +27,9 @@ def test_muon_rejects_non_2d():
 
 
 def test_muon_update_rms_is_scaled():
-    """One step from zero momentum: update = lr * 0.2*sqrt(max(m,n)) * orth(g); RMS ≈ lr*0.2*sqrt(max/ min?)"""
+    """One step from zero momentum: update = lr * 0.2*sqrt(max(m,n)) * orth(g). For a 64x32
+    gradient, orth(g) has 32 unit singular values, so its RMS is sqrt(32/(64*32)) = 1/8, and the
+    update RMS is lr * 0.2*sqrt(64) * 1/8 = 0.2*lr."""
     torch.manual_seed(0)
     p = torch.nn.Parameter(torch.zeros(64, 32))
     opt = Muon([p], lr=1.0, momentum=0.0, nesterov=False, weight_decay=0.0)
@@ -47,7 +49,8 @@ def test_muon_weight_decay_is_decoupled():
 
 
 def test_muon_reduces_quadratic_loss():
-    """Sign-like orthogonalized descent without momentum converges to within one step of the target."""
+    """Sign-like orthogonalized descent without momentum drives the loss below 20% of its
+    initial value within 100 steps."""
     torch.manual_seed(0)
     target = torch.randn(16, 16)
     p = torch.nn.Parameter(torch.zeros(16, 16))
@@ -56,3 +59,21 @@ def test_muon_reduces_quadratic_loss():
     for _ in range(100):
         loss = (p - target).pow(2).mean(); opt.zero_grad(); loss.backward(); opt.step(); losses.append(loss.item())
     assert losses[-1] < 0.2 * losses[0]
+
+
+def test_muon_update_is_invariant_to_gradient_scale():
+    """Newton-Schulz orthogonalization is (approximately) scale-invariant, so scaling the
+    gradient should not change the update: two optimizers fed g and 32*g for three steps
+    should stay bit-identical."""
+    torch.manual_seed(0)
+    g = torch.randn(16, 16)
+    p1 = torch.nn.Parameter(torch.zeros(16, 16))
+    p2 = torch.nn.Parameter(torch.zeros(16, 16))
+    opt1 = Muon([p1], lr=0.1, momentum=0.95)
+    opt2 = Muon([p2], lr=0.1, momentum=0.95)
+    for _ in range(3):
+        p1.grad = g.clone()
+        p2.grad = (32 * g).clone()
+        opt1.step()
+        opt2.step()
+    assert torch.equal(p1, p2)

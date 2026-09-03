@@ -38,25 +38,30 @@ def _save(fig, fig_dir: Path, stem: str) -> list[Path]:
 
 
 def fig_erank_by_layer(pre: list[dict], fig_dir: Path) -> list[Path]:
-    fig, axes = plt.subplots(1, len(MODULES), figsize=(3 * len(MODULES), 3), sharey=False)
+    fig, axes = plt.subplots(
+        1, len(MODULES), figsize=(3 * len(MODULES), 3.6), sharey=False, layout="constrained"
+    )
     by = defaultdict(lambda: defaultdict(dict))
     for r in pre:
         by[r["module"]][r["run"]][int(r["layer"])] = float(r["erank"])
-    for ax, mod in zip(axes, MODULES, strict=False):
+    for ax, mod in zip(axes, MODULES, strict=True):
         for run, layers in sorted(by[mod].items()):
             xs = sorted(layers)
             ax.plot(xs, [layers[x] for x in xs], marker="o", ms=3, color=COLOR[_opt(run)], label=run, alpha=0.8)
         ax.set_title(mod)
         ax.set_xlabel("layer")
     axes[0].set_ylabel("effective rank")
-    axes[0].legend(fontsize=6)
+    if axes[0].get_legend_handles_labels()[0]:
+        axes[0].legend(fontsize=6)
     fig.suptitle("H1: effective rank of pretrained weights by layer")
     return _save(fig, fig_dir, "fig_erank_by_layer")
 
 
 def fig_delta_erank(delta: list[dict], fig_dir: Path) -> list[Path]:
     tasks = sorted({r["task"] for r in delta})
-    fig, axes = plt.subplots(1, max(1, len(tasks)), figsize=(4 * max(1, len(tasks)), 3), squeeze=False)
+    fig, axes = plt.subplots(
+        1, max(1, len(tasks)), figsize=(4 * max(1, len(tasks)), 3.6), squeeze=False, layout="constrained"
+    )
     for ax, task in zip(axes[0], tasks, strict=False):
         by = defaultdict(lambda: defaultdict(list))
         for r in delta:
@@ -75,7 +80,8 @@ def fig_delta_erank(delta: list[dict], fig_dir: Path) -> list[Path]:
         ax.set_title(f"task: {task}")
         ax.set_xlabel("layer")
         ax.set_ylabel("mean effective rank of ΔW")
-        ax.legend(fontsize=6)
+        if ax.get_legend_handles_labels()[0]:
+            ax.legend(fontsize=6)
     fig.suptitle("H2: effective rank of the full fine-tuning update")
     return _save(fig, fig_dir, "fig_delta_erank")
 
@@ -93,7 +99,9 @@ def fig_lora_gap(
 ) -> list[Path]:
     rows = _lora_rows(res)
     tasks = sorted({r["task"] for r in rows})
-    fig, axes = plt.subplots(1, max(1, len(tasks)), figsize=(4 * max(1, len(tasks)), 3), squeeze=False)
+    fig, axes = plt.subplots(
+        1, max(1, len(tasks)), figsize=(4 * max(1, len(tasks)), 3.6), squeeze=False, layout="constrained"
+    )
     for ax, task in zip(axes[0], tasks, strict=False):
         by = defaultdict(dict)
         for r in rows:
@@ -106,7 +114,8 @@ def fig_lora_gap(
         ax.set_xlabel("LoRA rank")
         ax.set_ylabel(ylabel)
         ax.set_title(f"task: {task}")
-        ax.legend(fontsize=6)
+        if ax.get_legend_handles_labels()[0]:
+            ax.legend(fontsize=6)
     fig.suptitle("H3: LoRA gap versus rank" if key == "recovered" else "forgetting versus rank")
     return _save(fig, fig_dir, stem)
 
@@ -116,7 +125,7 @@ def fig_energy_vs_recovered(delta: list[dict], res: list[dict], fig_dir: Path) -
     for r in delta:
         for k in (4, 16, 64):
             energy[(r["parent"], r["task"], k)].append(float(r[f"top{k}"]))
-    fig, ax = plt.subplots(figsize=(4, 4))
+    fig, ax = plt.subplots(figsize=(4.5, 4.5), layout="constrained")
     for r in _lora_rows(res):
         key = (r["parent"], r["task"], int(r["rank"]))
         if key in energy and not math.isnan(float(r["recovered"])):
@@ -127,7 +136,13 @@ def fig_energy_vs_recovered(delta: list[dict], res: list[dict], fig_dir: Path) -
                 color=COLOR[_opt(r["parent"])],
                 marker="o" if r["task"] == "code" else "s",
             )
-            ax.annotate(f"r{r['rank']}", (x, float(r["recovered"])), fontsize=6)
+            ax.annotate(
+                f"r{r['rank']}",
+                (x, float(r["recovered"])),
+                fontsize=6,
+                xytext=(4, 4),
+                textcoords="offset points",
+            )
     ax.plot([0, 1], [0, 1], ls="--", color="gray", lw=0.8)
     ax.set_xlabel("mean top-r energy of full-FT ΔW")
     ax.set_ylabel("recovered fraction at rank r")

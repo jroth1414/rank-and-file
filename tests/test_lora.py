@@ -37,3 +37,13 @@ def test_lora_state_dict_shapes():
     assert "blocks.0.attn.q.weight" not in sd and "blocks.0.attn.q" in sd
     assert sd["blocks.0.mlp.down"]["A"].shape == (3, 64) and sd["blocks.0.mlp.down"]["B"].shape == (32, 3)
     assert len(sd) == 2 * len(TARGETS)
+
+
+def test_merge_restores_each_params_prior_requires_grad():
+    m = _m()
+    m.embed.weight.requires_grad_(False)  # e.g. frozen for a reason unrelated to LoRA
+    apply_lora(m, r=4, alpha=8)
+    assert not m.embed.weight.requires_grad
+    merge_lora(m)
+    assert not m.embed.weight.requires_grad  # restored, not blanket-set to True
+    assert m.blocks[0].attn.q.weight.requires_grad  # was trainable before LoRA, stays so

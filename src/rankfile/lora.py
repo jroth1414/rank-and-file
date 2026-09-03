@@ -31,6 +31,9 @@ def apply_lora(
     alpha: float,
     targets: tuple[str, ...] = TARGETS,
 ) -> list[nn.Parameter]:
+    # Stashed so merge_lora can restore each parameter's own prior requires_grad
+    # (e.g. an embedding already frozen for other reasons) instead of a blanket True.
+    model._lora_prev_requires_grad = {id(p): p.requires_grad for p in model.parameters()}
     for p in model.parameters():
         p.requires_grad_(False)
     trainable: list[nn.Parameter] = []
@@ -64,5 +67,6 @@ def merge_lora(model: nn.Module) -> None:
         parent_name, attr = name.rsplit(".", 1)
         parent = model.get_submodule(parent_name)
         setattr(parent, attr, mod.base)
+    prev = getattr(model, "_lora_prev_requires_grad", None)
     for p in model.parameters():
-        p.requires_grad_(True)
+        p.requires_grad_(prev.get(id(p), True) if prev is not None else True)

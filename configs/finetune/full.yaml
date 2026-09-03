@@ -1,2 +1,3 @@
+# lr is the sweep placeholder; replace with the ft_sweep winner (configs/queue/ft_sweep.txt) and log it in CLAUDE.md §11.
 lr: 1.0e-4
 weight_decay: 0.0

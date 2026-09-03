@@ -3,12 +3,17 @@ from scripts.ft_grid import grid_lines
 
 
 def test_grid_lines_cover_all_cells():
+    lrs = {
+        ("full", "code"): 1e-4,
+        ("full", "sup"): 1e-4,
+        ("lora", "code"): 1e-3,
+        ("lora", "sup"): 1e-3,
+    }
     lines = grid_lines(
         ["runs/p1_adamw_m124_s0", "runs/p2_muon_m124_s0"],
         ranks=[4, 16, 64],
         tasks=["code", "sup"],
-        full_lr=1e-4,
-        lora_lr=1e-3,
+        lrs=lrs,
         py=".venv\\Scripts\\python.exe",
     )
     assert len(lines) == 2 * (1 + 3) * 2

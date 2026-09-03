@@ -25,7 +25,7 @@ from rankfile.tasks import (
     sup_loss,
 )
 from rankfile.tokenizer import load_tokenizer
-from rankfile.train import MetricsLog, evaluate
+from rankfile.train import MetricsLog, _git_hash, evaluate
 
 
 @dataclass
@@ -33,7 +33,7 @@ class FinetuneConfig:
     parent: str = ""               # run dir of the pretrained twin
     method: str = "full"           # full | lora
     rank: int = 16
-    alpha: float = 32.0
+    alpha: float | None = None     # None resolves to 2 * rank at run time
     task: str = "code"             # code | sup
     lr: float = 1e-4
     weight_decay: float = 0.0
@@ -55,7 +55,8 @@ class FinetuneConfig:
     tokenizer: str = "data/tokenizer.json"
     # shared
     data_dir_pre: str = "data/fineweb_edu"
-    eval_windows: int = 256
+    eval_windows: int = 512
+    mem_ceiling_gib: float = 14.0
     seed: int = 0
     compile: bool = True
     name: str = ""
@@ -94,9 +95,32 @@ def _sup_eval(model, tok, data, device) -> dict[str, float]:
             prompt, label = format_example(t, r)
             correct += int(score_options(model, tok, prompt, t.labels, device) == label)
         out[f"{name}_acc"] = correct / len(ev)
+        out[f"{name}_n"] = len(ev)
     out["sup_acc_mean"] = sum(v for k, v in out.items() if k.endswith("_acc")) / len(data)
     model.train()
     return out
+
+
+def _bucketed_batches(
+    examples: list[tuple[list[int], list[int]]],
+    order: list[int],
+    batch_size: int,
+    generator: torch.Generator,
+    mega_mult: int = 50,
+) -> list[list[int]]:
+    """Group a seeded permutation into batches of similar encoded length, then shuffle
+    the batch order (with the same generator). Sorting inside fixed-size mega-batches
+    rather than globally keeps the epoch's example set and batch count identical to a
+    plain permutation while cutting most of the padding.
+    """
+    mega = mega_mult * batch_size
+    batches = []
+    for i in range(0, len(order), mega):
+        chunk = sorted(order[i : i + mega], key=lambda j: len(examples[j][0]))
+        for k in range(0, len(chunk) - batch_size + 1, batch_size):
+            batches.append(chunk[k : k + batch_size])
+    perm = torch.randperm(len(batches), generator=generator).tolist()
+    return [batches[p] for p in perm]
 
 
 def _code_eval(loss_fn, cfg, device) -> float:
@@ -109,6 +133,23 @@ def _pre_eval(loss_fn, cfg, device) -> float:
     return evaluate(loss_fn, vs, cfg.seq_len, cfg.micro_batch, cfg.eval_windows, device)
 
 
+def _mem_guard(on_cuda: bool, done: int, ceiling_gib: float) -> float:
+    """Read peak CUDA memory after an optimizer step; raise past the ceiling once warm.
+
+    `done` is the count of optimizer steps taken so far (1-indexed). The first two
+    steps include one-time compile transients, so the ceiling only applies from the
+    3rd step on, and the peak is reset once at that point (mirrors rankfile.train).
+    """
+    mem = torch.cuda.max_memory_allocated() / 2**30 if on_cuda else 0.0
+    if on_cuda and done >= 3 and mem > ceiling_gib:
+        raise RuntimeError(
+            f"peak memory {mem:.1f} GiB exceeds ceiling {ceiling_gib}; WDDM would page to RAM"
+        )
+    if on_cuda and done == 3:
+        torch.cuda.reset_peak_memory_stats()
+    return mem
+
+
 def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     on_cuda = str(device).startswith("cuda")
@@ -118,20 +159,33 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     run = Path(cfg.out_root) / cfg.name
     run.mkdir(parents=True, exist_ok=True)
     to_yaml(cfg, run / "config.resolved.yaml")
+    with open(run / "git.txt", "a", encoding="utf-8") as f:
+        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {_git_hash()}\n")
     log = MetricsLog(run)
     torch.manual_seed(cfg.seed)
     model, mc = _load_parent(cfg, device)
     if cfg.method == "lora":
         # apply_lora zero-inits B, so the wrapped model's forward pass is exactly the
         # parent's until the first optimizer step: "before" metrics are unaffected.
-        params = apply_lora(model, cfg.rank, cfg.alpha)
+        alpha = cfg.alpha if cfg.alpha is not None else 2.0 * cfg.rank
+        params = apply_lora(model, cfg.rank, alpha)
     else:
+        alpha = None
         params = list(model.parameters())
     opt = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=cfg.weight_decay)
     loss_fn = torch.compile(model.loss, dynamic=False) if (cfg.compile and on_cuda) else model.loss
 
     def ac():
         return torch.autocast("cuda", dtype=torch.bfloat16, enabled=on_cuda)
+
+    if cfg.task == "code":
+        ts = TokenStream(list_shards(cfg.data_dir_code, "train"))
+        sampler = FixedOrderSampler(ts.total_tokens, cfg.seq_len, cfg.seed)
+        accum = cfg.batch_tokens // (cfg.micro_batch * cfg.seq_len)
+        steps = cfg.train_tokens // cfg.batch_tokens
+        need = steps * accum * cfg.micro_batch
+        if need > sampler.n_windows:
+            raise ValueError(f"code stream has {sampler.n_windows} windows, run needs {need}")
 
     before = {"pre_val_loss": _pre_eval(loss_fn, cfg, device)}
     if cfg.task == "code":
@@ -145,10 +199,6 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
 
     t0 = time.time()  # training only: "before"/"after" evals are excluded on both ends
     if cfg.task == "code":
-        ts = TokenStream(list_shards(cfg.data_dir_code, "train"))
-        sampler = FixedOrderSampler(ts.total_tokens, cfg.seq_len, cfg.seed)
-        accum = cfg.batch_tokens // (cfg.micro_batch * cfg.seq_len)
-        steps = cfg.train_tokens // cfg.batch_tokens
         pos = 0
         for step in range(steps):
             for g in opt.param_groups:
@@ -167,8 +217,11 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
             torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
             opt.step()
             opt.zero_grad(set_to_none=True)
+            mem = _mem_guard(on_cuda, step + 1, cfg.mem_ceiling_gib)
             if step % 10 == 0:
-                log.write(step=step, loss=acc.item(), lr=opt.param_groups[0]["lr"])
+                mem_reserved = torch.cuda.max_memory_reserved() / 2**30 if on_cuda else 0.0
+                log.write(step=step, loss=acc.item(), lr=opt.param_groups[0]["lr"],
+                          mem_gib=mem, mem_reserved_gib=mem_reserved)
     else:  # sup
         examples = []
         for n, (tr, _) in data.items():
@@ -181,10 +234,10 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         step = 0
         for _ in range(cfg.epochs):
             order = torch.randperm(len(examples), generator=g).tolist()
-            for i in range(0, len(order) - cfg.sup_batch + 1, cfg.sup_batch):
+            for batch_idx in _bucketed_batches(examples, order, cfg.sup_batch, g):
                 for pg in opt.param_groups:
                     pg["lr"] = wsd_lr(step, steps, cfg.lr, cfg.warmup_frac, cfg.decay_frac)
-                batch = [examples[j] for j in order[i:i + cfg.sup_batch]]
+                batch = [examples[j] for j in batch_idx]
                 ids, mask = collate_sup(batch)
                 with ac():
                     loss = sup_loss(model, ids.to(device), mask.to(device))
@@ -192,8 +245,11 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
                 torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
                 opt.step()
                 opt.zero_grad(set_to_none=True)
+                mem = _mem_guard(on_cuda, step + 1, cfg.mem_ceiling_gib)
                 if step % 10 == 0:
-                    log.write(step=step, loss=loss.item(), lr=opt.param_groups[0]["lr"])
+                    mem_reserved = torch.cuda.max_memory_reserved() / 2**30 if on_cuda else 0.0
+                    log.write(step=step, loss=loss.item(), lr=opt.param_groups[0]["lr"],
+                              mem_gib=mem, mem_reserved_gib=mem_reserved)
                 step += 1
     train_seconds = time.time() - t0
 
@@ -206,12 +262,16 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         torch.save(lora_state_dict(model), run / "lora.pt")
     else:
         torch.save({k: v.detach().cpu() for k, v in model.state_dict().items()}, run / "model.pt")
+    parent_ckpt = read_latest(cfg.parent)
     results = {
         "parent": parent_name,
+        "parent_ckpt": parent_ckpt.name if parent_ckpt is not None else None,
         "method": cfg.method,
         "rank": cfg.rank if cfg.method == "lora" else None,
+        "alpha": alpha,
         "task": cfg.task,
         "lr": cfg.lr,
+        "seed": cfg.seed,
         "before": before,
         "after": after,
         "train_seconds": train_seconds,

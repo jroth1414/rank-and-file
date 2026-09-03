@@ -32,8 +32,11 @@ def _block_matrices(sd: dict) -> dict[str, torch.Tensor]:
     return {k: v for k, v in sd.items() if k.startswith("blocks.") and v.ndim == 2}
 
 
-def _metric(task: str, d: dict) -> float:
-    return -d["code_val_loss"] if task == "code" else d["sup_acc_mean"]
+def _metric(task: str, d: dict, run: str) -> float:
+    key = "code_val_loss" if task == "code" else "sup_acc_mean"
+    if key not in d:
+        raise KeyError(f"{run}: results.json lacks {key}")
+    return -d[key] if task == "code" else d[key]
 
 
 def analyze(runs_root: Path, out_dir: Path) -> dict[str, Path]:
@@ -55,7 +58,7 @@ def analyze(runs_root: Path, out_dir: Path) -> dict[str, Path]:
     # Full-FT deltas and per-(parent, task) full-run lookup, needed by both the
     # LoRA-overlap and LoRA-gap passes below.
     full_deltas: dict[tuple[str, str], dict[str, torch.Tensor]] = {}
-    full_by_cell: dict[tuple[str, str], dict] = {}
+    full_by_cell: dict[tuple[str, str], tuple[str, dict]] = {}
     for p in ft_runs:
         r = results[p.name]
         if r["method"] != "full":
@@ -64,7 +67,7 @@ def analyze(runs_root: Path, out_dir: Path) -> dict[str, Path]:
         ft = torch.load(p / "model.pt", weights_only=False)
         deltas = {k: ft[k].float() - pre[k].float() for k in _block_matrices(pre)}
         full_deltas[(r["parent"], r["task"])] = deltas
-        full_by_cell[(r["parent"], r["task"])] = r
+        full_by_cell[(r["parent"], r["task"])] = (p.name, r)
         for k, D in deltas.items():
             delta_rows.append({"run": p.name, "parent": r["parent"], "task": r["task"], **matrix_report(k, D)})
 
@@ -86,20 +89,23 @@ def analyze(runs_root: Path, out_dir: Path) -> dict[str, Path]:
     # eval) within 1e-3, or the two runs aren't comparable.
     for p in ft_runs:
         r = results[p.name]
-        before = _metric(r["task"], r["before"])
-        after = _metric(r["task"], r["after"])
+        before = _metric(r["task"], r["before"], p.name)
+        after = _metric(r["task"], r["after"], p.name)
         full = full_by_cell.get((r["parent"], r["task"]))
-        m_full = _metric(r["task"], full["after"]) if full is not None else math.nan
+        full_name, full_r = full if full is not None else (None, None)
+        m_full = _metric(r["task"], full_r["after"], full_name) if full is not None else math.nan
         if r["method"] == "full" or full is None:
             recovered = math.nan
         else:
-            full_before = _metric(r["task"], full["before"])
+            full_before = _metric(r["task"], full_r["before"], full_name)
             if abs(before - full_before) > 1e-3:
                 raise ValueError(
                     f"{p.name}: before metric {before} disagrees with full-FT before {full_before} "
                     f"for parent {r['parent']!r} task {r['task']!r}"
                 )
-            recovered = (after - full_before) / (m_full - full_before)
+            # A full-FT run whose metric did not move (m_full == full_before) makes the
+            # "fraction of full-FT improvement recovered" undefined, not infinite/zero.
+            recovered = math.nan if m_full == full_before else (after - full_before) / (m_full - full_before)
         res_rows.append({
             "run": p.name, "parent": r["parent"], "task": r["task"], "method": r["method"], "rank": r["rank"],
             "metric_before": before, "metric_full": m_full, "metric_after": after, "recovered": recovered,

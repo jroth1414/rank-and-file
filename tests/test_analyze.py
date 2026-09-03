@@ -69,3 +69,13 @@ def test_analyze_mismatched_before_raises(tmp_path):
     _ft(root, "p1_adamw_m30_s0", "lora", "code", m1, rank=2, before=3.5, after=2.5)
     with pytest.raises(ValueError, match="p1_adamw_m30_s0__lora2_code"):
         analyze(root, tmp_path / "analysis")
+
+
+def test_analyze_recovered_is_nan_when_full_ft_did_not_move(tmp_path):
+    root = tmp_path / "runs"
+    m1 = _pre(root, "p1_adamw_m30_s0", "adamw")
+    _ft(root, "p1_adamw_m30_s0", "full", "code", m1, before=3.0, after=3.0)
+    _ft(root, "p1_adamw_m30_s0", "lora", "code", m1, rank=2, before=3.0, after=2.5)
+    out = analyze(root, tmp_path / "analysis")
+    res = {r["run"]: r for r in csv.DictReader(open(out["finetune_results"]))}
+    assert math.isnan(float(res["p1_adamw_m30_s0__lora2_code"]["recovered"]))

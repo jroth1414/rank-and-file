@@ -61,7 +61,7 @@ def _overlap_rows():
         dict(
             run=f"{p}__lora{r}_{t}", parent=p, task=t, rank=r, name="blocks.0.attn.q",
             lr=1e-4, optimizer=o, arm=arm, seed=seed,
-            overlap=0.3, overlap_two_sided=0.2, chance=r / 8,
+            overlap=0.3, overlap_two_sided=0.2, chance_one=r / 8, chance_two=(r * r) / (8 * 8),
         )
         for p, o, arm, seed in PARENTS
         for t in ("code", "sup")

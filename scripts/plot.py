@@ -232,30 +232,49 @@ def fig_overlap(ov: list[dict], fig_dir: Path) -> list[Path]:
         1, max(1, len(tasks)), figsize=(4 * max(1, len(tasks)), 3.6), squeeze=False, layout="constrained"
     )
     for ax, task in zip(axes[0], tasks, strict=False):
-        by = defaultdict(lambda: defaultdict(list))
-        chance_by = defaultdict(list)
+        by_two = defaultdict(lambda: defaultdict(list))
+        by_one = defaultdict(lambda: defaultdict(list))
+        chance_one_by = defaultdict(list)
+        chance_two_by = defaultdict(list)
         meta: dict[str, dict] = {}
         for r in ov:
             if r["task"] != task:
                 continue
-            by[r["parent"]][int(r["rank"])].append(float(r["overlap_two_sided"]))
-            chance_by[int(r["rank"])].append(float(r["chance"]))
+            rank = int(r["rank"])
+            by_two[r["parent"]][rank].append(float(r["overlap_two_sided"]))
+            by_one[r["parent"]][rank].append(float(r["overlap"]))
+            chance_one_by[rank].append(float(r["chance_one"]))
+            chance_two_by[rank].append(float(r["chance_two"]))
             meta[r["parent"]] = r
-        for parent, pts in sorted(by.items()):
+        for parent, pts in sorted(by_two.items()):
             xs = sorted(pts)
-            ax.plot(xs, [sum(pts[x]) / len(pts[x]) for x in xs], label=parent, **_style(meta[parent]))
-        if chance_by:
-            xs = sorted(chance_by)
+            style = _style(meta[parent])
+            ax.plot(xs, [sum(pts[x]) / len(pts[x]) for x in xs], label=f"{parent} (two-sided)", **style)
+            one_pts = by_one[parent]
+            one_xs = sorted(one_pts)
             ax.plot(
-                xs, [sum(chance_by[x]) / len(chance_by[x]) for x in xs],
-                linestyle=":", color="gray", lw=1.2, label="chance",
+                one_xs, [sum(one_pts[x]) / len(one_pts[x]) for x in one_xs],
+                label=f"{parent} (one-sided)", color=style["color"], marker=style["marker"],
+                linestyle="--", alpha=0.55,
+            )
+        if chance_one_by:
+            xs = sorted(chance_one_by)
+            ax.plot(
+                xs, [sum(chance_one_by[x]) / len(chance_one_by[x]) for x in xs],
+                linestyle=":", color="gray", lw=1.2, label="chance, one-sided",
+            )
+        if chance_two_by:
+            xs = sorted(chance_two_by)
+            ax.plot(
+                xs, [sum(chance_two_by[x]) / len(chance_two_by[x]) for x in xs],
+                linestyle=":", color="black", lw=1.2, label="chance, two-sided",
             )
         _log2_rank_axis(ax)
-        ax.set_ylabel("two-sided subspace overlap")
+        ax.set_ylabel("subspace overlap")
         ax.set_title(f"task: {task}")
         if ax.get_legend_handles_labels()[0]:
             ax.legend(fontsize=6)
-    fig.suptitle("LoRA subspace overlap with the full fine-tuning update")
+    fig.suptitle("LoRA subspace overlap with the full fine-tuning update, one- and two-sided")
     return _save(fig, fig_dir, "fig_overlap")
 
 

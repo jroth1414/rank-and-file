@@ -96,19 +96,38 @@ def test_subspace_overlap_two_sided_equals_top_r_energy_for_top_singular_vectors
     assert abs(got - want) < 1e-4
 
 
-def test_subspace_overlap_two_sided_random_is_small_and_below_chance():
-    """For random B, A of rank r against an independent random delta, the two-sided
-    overlap is small: it lands well under the r/min(m, n) chance baseline used for
-    the CSV column (the true expectation, r^2/(m*n), is even smaller since the
-    projection is constrained on both sides at once)."""
-    torch.manual_seed(0)
+def test_subspace_overlap_random_B_matches_one_sided_chance():
+    """Averaged over many draws, the one-sided overlap of a random rank-r B against an
+    independent random delta converges to the one-sided chance baseline r/m (m = rows
+    of delta/B) -- the chance_one column in lora_overlap.csv -- not r/min(m, n)."""
     m, n, r = 40, 30, 4
-    delta = torch.randn(m, n)
-    B = torch.randn(m, r)
-    A = torch.randn(r, n)
-    got = subspace_overlap_two_sided(delta, B, A)
-    chance = r / min(m, n)
-    assert 0.0 < got < chance
+    vals = []
+    for seed in range(20):
+        torch.manual_seed(seed)
+        delta = torch.randn(m, n)
+        B = torch.randn(m, r)
+        vals.append(subspace_overlap(delta, B))
+    mean = sum(vals) / len(vals)
+    chance = r / m
+    assert abs(mean - chance) / chance < 0.5
+
+
+def test_subspace_overlap_two_sided_random_matches_two_sided_chance():
+    """Averaged over many draws, the two-sided overlap of random rank-r B, A against an
+    independent random delta converges to the two-sided chance baseline r^2/(m*n) --
+    the chance_two column in lora_overlap.csv -- not r/min(m, n): projecting on both
+    sides at once compounds multiplicatively, not additively."""
+    m, n, r = 40, 30, 4
+    vals = []
+    for seed in range(20):
+        torch.manual_seed(1000 + seed)
+        delta = torch.randn(m, n)
+        B = torch.randn(m, r)
+        A = torch.randn(r, n)
+        vals.append(subspace_overlap_two_sided(delta, B, A))
+    mean = sum(vals) / len(vals)
+    chance = (r * r) / (m * n)
+    assert abs(mean - chance) / chance < 0.5
 
 
 def test_subspace_overlap_two_sided_zero_cases():

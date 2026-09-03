@@ -203,12 +203,17 @@ def analyze(
             lsd = torch.load(p / "lora.pt", weights_only=False)
             for name, ab in lsd.items():
                 D = deltas[name + ".weight"]
+                rows_, cols_ = D.shape[0], D.shape[1]
                 ov_rows.append({
                     "run": p.name, "parent": r["parent"], "task": r["task"], "rank": r["rank"],
                     "name": name, "lr": r.get("lr"), **meta,
                     "overlap": subspace_overlap(D, ab["B"]),
                     "overlap_two_sided": subspace_overlap_two_sided(D, ab["B"], ab["A"]),
-                    "chance": r["rank"] / min(D.shape[0], D.shape[1]),
+                    # chance_one is the one-sided baseline (colspace(B) subset R^rows only);
+                    # chance_two is the two-sided baseline (both colspace(B) and rowspace(A)
+                    # constrained at once). Neither equals r/min(rows, cols) in general.
+                    "chance_one": r["rank"] / rows_,
+                    "chance_two": (r["rank"] * r["rank"]) / (rows_ * cols_),
                 })
             del lsd
 
@@ -266,7 +271,8 @@ def analyze(
         ),
         "lora_overlap": _write(
             out_dir / "lora_overlap.csv", ov_rows,
-            ["run", "parent", "task", "rank", "name", "lr", *PARENT_META, "overlap", "overlap_two_sided", "chance"],
+            ["run", "parent", "task", "rank", "name", "lr", *PARENT_META,
+             "overlap", "overlap_two_sided", "chance_one", "chance_two"],
         ),
         "finetune_results": _write(
             out_dir / "finetune_results.csv", res_rows,

@@ -60,7 +60,9 @@ def test_analyze_writes_all_csvs(tmp_path):
     ov = list(csv.DictReader(open(out["lora_overlap"])))
     assert len(ov) == 7 and all(0.0 <= float(r["overlap"]) <= 1.0 + 1e-6 for r in ov)
     assert all(0.0 <= float(r["overlap_two_sided"]) <= 1.0 + 1e-6 for r in ov)
-    assert all(abs(float(r["chance"]) - 2 / min(16, 16)) < 1e-9 or float(r["chance"]) > 0 for r in ov)
+    assert all(float(r["chance_one"]) > 0 and float(r["chance_two"]) > 0 for r in ov)
+    # chance_two (both sides constrained) is never looser than chance_one (one side only).
+    assert all(float(r["chance_two"]) <= float(r["chance_one"]) + 1e-9 for r in ov)
     assert all(r["optimizer"] == "adamw" and r["arm"] == "p1" and r["seed"] == "0" for r in ov)
     res = {r["run"]: r for r in csv.DictReader(open(out["finetune_results"]))}
     assert abs(float(res["p1_adamw_m30_s0__lora2_code"]["recovered"]) - 0.5) < 1e-9

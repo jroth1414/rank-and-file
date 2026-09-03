@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pytest
 import torch
 
 from rankfile.checkpoint import save_checkpoint, write_latest
@@ -40,6 +41,7 @@ def _cfg(tmp_path, run, **kw):
                           eval_windows=8, compile=False, **kw)
 
 
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
 def test_full_code_ft_improves_code_loss_and_saves_model(tmp_path):
     run = _parent(tmp_path)
     out = finetune(_cfg(tmp_path, run, method="full", task="code", lr=3e-3), device="cpu")
@@ -48,6 +50,7 @@ def test_full_code_ft_improves_code_loss_and_saves_model(tmp_path):
     assert out.name == "parent__full_code"
 
 
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
 def test_lora_code_ft_saves_lora_only(tmp_path):
     run = _parent(tmp_path)
     out = finetune(_cfg(tmp_path, run, method="lora", rank=2, alpha=4, task="code", lr=1e-2),
@@ -58,6 +61,7 @@ def test_lora_code_ft_saves_lora_only(tmp_path):
     assert sd["blocks.0.attn.q"]["A"].shape[0] == 2
 
 
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
 def test_sup_ft_runs_on_fake_examples(tmp_path, monkeypatch):
     run = _parent(tmp_path)
     train_tokenizer(["Review: good bad\nSentiment: positive negative " * 50],

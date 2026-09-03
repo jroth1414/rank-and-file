@@ -66,7 +66,10 @@ def _load_parent(cfg: FinetuneConfig, device) -> tuple[Transformer, ModelConfig]
     parent = Path(cfg.parent)
     mc = from_dict(ModelConfig, load_yaml(parent / "model.yaml"))
     model = Transformer(mc)
-    model.load_state_dict(load_model_state(read_latest(parent)))
+    ckpt = read_latest(parent)
+    if ckpt is None or not ckpt.exists():
+        raise FileNotFoundError(f"{parent} has no latest.txt / checkpoint")
+    model.load_state_dict(load_model_state(ckpt))
     return model.to(device), mc
 
 
@@ -119,6 +122,8 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     torch.manual_seed(cfg.seed)
     model, mc = _load_parent(cfg, device)
     if cfg.method == "lora":
+        # apply_lora zero-inits B, so the wrapped model's forward pass is exactly the
+        # parent's until the first optimizer step: "before" metrics are unaffected.
         params = apply_lora(model, cfg.rank, cfg.alpha)
     else:
         params = list(model.parameters())
@@ -129,9 +134,17 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         return torch.autocast("cuda", dtype=torch.bfloat16, enabled=on_cuda)
 
     before = {"pre_val_loss": _pre_eval(loss_fn, cfg, device)}
-    t0 = time.time()
     if cfg.task == "code":
         before["code_val_loss"] = _code_eval(loss_fn, cfg, device)
+    elif cfg.task == "sup":
+        tok = load_tokenizer(cfg.tokenizer)
+        data = _sup_data(cfg)
+        before.update(_sup_eval(model, tok, data, device))
+    else:
+        raise ValueError(f"unknown task {cfg.task!r}")
+
+    t0 = time.time()  # training only: "before"/"after" evals are excluded on both ends
+    if cfg.task == "code":
         ts = TokenStream(list_shards(cfg.data_dir_code, "train"))
         sampler = FixedOrderSampler(ts.total_tokens, cfg.seq_len, cfg.seed)
         accum = cfg.batch_tokens // (cfg.micro_batch * cfg.seq_len)
@@ -156,11 +169,7 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
             opt.zero_grad(set_to_none=True)
             if step % 10 == 0:
                 log.write(step=step, loss=acc.item(), lr=opt.param_groups[0]["lr"])
-        after = {"code_val_loss": _code_eval(loss_fn, cfg, device)}
-    elif cfg.task == "sup":
-        tok = load_tokenizer(cfg.tokenizer)
-        data = _sup_data(cfg)
-        before.update(_sup_eval(model, tok, data, device))
+    else:  # sup
         examples = []
         for n, (tr, _) in data.items():
             t = SUP_TASKS[n]
@@ -186,9 +195,12 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
                 if step % 10 == 0:
                     log.write(step=step, loss=loss.item(), lr=opt.param_groups[0]["lr"])
                 step += 1
-        after = _sup_eval(model, tok, data, device)
+    train_seconds = time.time() - t0
+
+    if cfg.task == "code":
+        after = {"code_val_loss": _code_eval(loss_fn, cfg, device)}
     else:
-        raise ValueError(f"unknown task {cfg.task!r}")
+        after = _sup_eval(model, tok, data, device)
     after["pre_val_loss"] = _pre_eval(loss_fn, cfg, device)
     if cfg.method == "lora":
         torch.save(lora_state_dict(model), run / "lora.pt")
@@ -202,7 +214,7 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         "lr": cfg.lr,
         "before": before,
         "after": after,
-        "train_seconds": time.time() - t0,
+        "train_seconds": train_seconds,
     }
     (run / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     return run

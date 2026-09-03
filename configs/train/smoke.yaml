@@ -1,0 +1,26 @@
+# configs/train/smoke.yaml — m30 on the 50M-token smoke shards; ~2 minutes on the 5070 Ti.
+name: smoke_adamw_m30_s0
+arm: smoke
+optimizer: adamw
+peak_lr: 3.0e-3
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+total_tokens: 10485760        # 20 steps
+batch_tokens: 524288
+micro_batch: 8
+seq_len: 2048
+seed: 0
+data_dir: data/fineweb_edu_smoke
+warmup_frac: 0.1
+decay_frac: 0.2
+grad_clip: 1.0
+eval_every_tokens: 5242880
+eval_windows: 64
+ckpt_every_minutes: 1.0
+keep_every_tokens: 5242880
+compile: true
+use_doc_mask: true
+mem_ceiling_gib: 14.0
+log_every_steps: 1
+out_root: runs

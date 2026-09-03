@@ -1,0 +1,26 @@
+# configs/train/muon.yaml — arm P2. Identical to adamw.yaml except optimizer. peak_lr is the sweep placeholder; replace with the sweep winner.
+name: ""
+arm: p2
+optimizer: muon
+peak_lr: 2.0e-3
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+total_tokens: 2500000000
+batch_tokens: 524288
+micro_batch: 8
+seq_len: 2048
+seed: 0
+data_dir: data/fineweb_edu
+warmup_frac: 0.02
+decay_frac: 0.2
+grad_clip: 1.0
+eval_every_tokens: 50000000
+eval_windows: 512
+ckpt_every_minutes: 60.0
+keep_every_tokens: 250000000
+compile: true
+use_doc_mask: true
+mem_ceiling_gib: 14.0
+log_every_steps: 10
+out_root: runs

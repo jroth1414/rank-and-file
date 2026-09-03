@@ -315,6 +315,25 @@ Append, never rewrite. Format: date, decision, reason.
   to stretch so the core is finishable in weeks 1–4 on one GPU.
 - **2026-09-01** — All compute local on the 5070 Ti by the student's choice;
   cloud budget is a reserve. Second seeds scheduled after the first FT grid.
+- **2026-09-02** — **One shared peak LR per arm.** In the Muon arm the
+  embedding and norm gains (AdamW) use the same peak LR as Muon's hidden
+  matrices, as in Moonlight (the 0.2·√max(m,n) scaling matches Muon's update
+  RMS to AdamW's so one LR grid serves both). `build_optimizers` exposes
+  `adamw_lr_scale` (default 1.0) so the choice is explicit; it stays 1.0
+  unless the sweep shows instability, and any change is logged here.
+- **2026-09-02** — **Gradient handling is arm-symmetric by setting, not by
+  effect.** Accumulated micro-batch losses are averaged (÷32) and global-norm
+  clipping at 1.0 applies in both arms. Muon's update is exactly invariant to
+  gradient scale, AdamW's is not (ε), so clipping perturbs the arms
+  differently; that is inherent to comparing the optimizers and is not
+  tuned away. `grad_norm` is logged every step.
+- **2026-09-02** — **Newton–Schulz limitation to state in the paper.** Five
+  quintic NS steps amplify singular values by at most ≈3.44⁵ ≈ 484×, so
+  gradient directions more than ~500× below the top singular value are left
+  essentially unorthogonalized (measured: 30% of σ(X) < 0.5 at condition
+  number 2.4e3). This is reference Muon behaviour and is kept; H1's
+  "flatter spectra" mechanism is weaker than idealized orthogonalization on
+  ill-conditioned late-training gradients.
 - **2026-09-01** — Environment audit: **native Windows, no WSL2.** torch
   2.14.0+cu130 + triton-windows 3.8 gives working `torch.compile` (80k tok/s,
   7.6 GiB at micro-batch 8) and FlexAttention. Flash SDPA has no Windows kernel;

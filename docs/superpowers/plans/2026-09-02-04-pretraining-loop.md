@@ -39,7 +39,8 @@
 - `rankfile.model`: `ModelConfig`, `Transformer` with `.loss(idx, targets, doc_ids=None, block_mask=None)`, `doc_block_mask(doc_ids)`, `.num_params()`.
 - `rankfile.data`: `list_shards(dir, split)`, `TokenStream(paths)`, `FixedOrderSampler(total_tokens, seq_len, seed)`, `make_batch(stream, sampler, position, micro_batch, seq_len, device) -> (x, y, doc_ids)`.
 - `rankfile.optim.build`: `build_optimizers(model, name, lr, weight_decay, betas) -> list`, `set_lr(opts, lr)`, `optimizer_state_dicts(opts)`, `load_optimizer_state_dicts(opts, sds)`.
-- `rankfile.schedule.wsd_lr(step, total_steps, peak_lr, warmup_frac, decay_frac)`.
+- `rankfile.schedule.wsd_lr(step, total_steps, peak_lr, warmup_frac=0.02, decay_frac=0.2, final_ratio=0.0)`; warmup is at least one step whenever `warmup_frac > 0`.
+- `rankfile.optim.build.build_optimizers(model, name, lr, weight_decay, betas=(0.9, 0.95), adamw_lr_scale=1.0)`; `set_lr(opts, lr)` multiplies each group's stored `lr_scale`, so call it with the schedule's absolute value every step.
 
 ---
 

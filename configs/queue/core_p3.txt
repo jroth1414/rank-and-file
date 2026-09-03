@@ -1,0 +1,4 @@
+# configs/queue/core_p3.txt — P3, AdamW trained to P2's validation loss. Set
+# total_tokens in configs/train/p3_adamw.yaml from P2's final val_loss before
+# running this (see Plan 4 Task 7 Step 5); it is a placeholder until then.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/p3_adamw.yaml --seed 0 --name p3_adamw_m124_s0

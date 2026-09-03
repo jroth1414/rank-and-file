@@ -1,4 +1,4 @@
-# configs/train/p3_adamw.yaml — arm P3, AdamW trained to P2's validation loss. Identical to adamw.yaml except total_tokens.
+# arm P3. peak_lr is the sweep placeholder; total_tokens is a placeholder set from P2's final val_loss before launch (see Plan 4 Task 7 Step 5).
 name: ""
 arm: p3
 optimizer: adamw

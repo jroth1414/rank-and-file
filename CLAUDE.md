@@ -315,6 +315,13 @@ Append, never rewrite. Format: date, decision, reason.
   to stretch so the core is finishable in weeks 1–4 on one GPU.
 - **2026-09-01** — All compute local on the 5070 Ti by the student's choice;
   cloud budget is a reserve. Second seeds scheduled after the first FT grid.
+- **2026-09-02** — **Code fine-tuning corpus is `codeparrot/codeparrot-clean`**
+  (field `content`, rows whose `license` is one of mit, apache-2.0,
+  bsd-3-clause, bsd-2-clause, isc), built to 100.0M train and 5.0M val
+  tokens with a manifest. The planned `codeparrot/github-code-clean` is a
+  script-based dataset that `datasets` 5.x no longer loads, and
+  `bigcode/the-stack-smol` is gated. The corpus is identical across arms,
+  so the substitution cannot confound the comparison.
 - **2026-09-02** — **One shared peak LR per arm.** In the Muon arm the
   embedding and norm gains (AdamW) use the same peak LR as Muon's hidden
   matrices, as in Moonlight (the 0.2·√max(m,n) scaling matches Muon's update

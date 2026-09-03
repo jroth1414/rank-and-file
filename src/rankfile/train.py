@@ -202,6 +202,7 @@ def train(
     last_ckpt_time = time.time()
     next_eval = ((tokens_seen // cfg.eval_every_tokens) + 1) * cfg.eval_every_tokens
     t_log = time.time()
+    log_step_start = step  # for a correct tok/s window on the first log line and after resume
     stop_at = d["steps_total"] if max_steps is None else min(d["steps_total"], step + max_steps)
     while step < stop_at:
         lr = wsd_lr(step, d["steps_total"], cfg.peak_lr, cfg.warmup_frac, cfg.decay_frac)
@@ -227,20 +228,24 @@ def train(
             o.zero_grad(set_to_none=True)
         step += 1
         tokens_seen += cfg.batch_tokens
+        # Read peak memory every step (not just on log steps) so the WDDM paging guard
+        # fires immediately rather than up to log_every_steps-1 steps late.
+        mem = torch.cuda.max_memory_allocated() / 2**30 if on_cuda else 0.0
+        if on_cuda and step >= 3 and mem > cfg.mem_ceiling_gib:
+            raise RuntimeError(
+                f"peak memory {mem:.1f} GiB exceeds ceiling {cfg.mem_ceiling_gib}; "
+                "WDDM would page to RAM"
+            )
         if step % cfg.log_every_steps == 0 or step == 1:
             now = time.time()
-            mem = torch.cuda.max_memory_allocated() / 2**30 if on_cuda else 0.0
+            steps_elapsed = step - log_step_start
             log.write(
                 step=step, tokens=tokens_seen, loss=loss_acc.item(), lr=lr, grad_norm=float(gnorm),
-                tok_per_s=cfg.batch_tokens * cfg.log_every_steps / max(1e-9, now - t_log),
+                tok_per_s=cfg.batch_tokens * steps_elapsed / max(1e-9, now - t_log),
                 mem_gib=mem,
             )
             t_log = now
-            if on_cuda and step >= 3 and mem > cfg.mem_ceiling_gib:
-                raise RuntimeError(
-                    f"peak memory {mem:.1f} GiB exceeds ceiling {cfg.mem_ceiling_gib}; "
-                    "WDDM would page to RAM"
-                )
+            log_step_start = step
         if tokens_seen >= next_eval:
             vl = evaluate(
                 loss_fn, val_stream, cfg.seq_len, cfg.micro_batch, cfg.eval_windows, device,

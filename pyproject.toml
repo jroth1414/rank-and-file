@@ -37,7 +37,7 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501", "E702", "E401", "E701", "E741", "F841"]
+"tests/*" = ["E501", "E702", "E401", "E701", "E741"]
 "scripts/*" = ["E501", "E702", "E401"]
 
 [tool.pytest.ini_options]

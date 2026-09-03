@@ -21,30 +21,29 @@ def _name(line: str) -> str:
 
 def run_queue(queue_file: Path, runs_root: Path = Path("runs")) -> dict[str, str]:
     runs_root.mkdir(parents=True, exist_ok=True)
-    logf = open(runs_root / "queue.log", "a", encoding="utf-8")
-
-    def log(msg: str) -> None:
-        line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
-        print(line, flush=True)
-        logf.write(line + "\n"); logf.flush()
-
     summary: dict[str, str] = {}
-    for raw in Path(queue_file).read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        name = _name(line)
-        if (runs_root / name / "DONE").exists():
-            log(f"skip {name}: DONE exists"); summary[name] = "skipped"; continue
-        status = "failed"
-        for attempt in (1, 2):
-            log(f"start {name} (attempt {attempt}): {line}")
-            rc = subprocess.call(line, shell=True)
-            if rc == 0:
-                status = "ok"; log(f"ok {name}"); break
-            log(f"exit {rc} for {name}")
-        summary[name] = status
-    logf.close()
+    with open(runs_root / "queue.log", "a", encoding="utf-8") as logf:
+
+        def log(msg: str) -> None:
+            line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
+            print(line, flush=True)
+            logf.write(line + "\n"); logf.flush()
+
+        for raw in Path(queue_file).read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            name = _name(line)
+            if (runs_root / name / "DONE").exists():
+                log(f"skip {name}: DONE exists"); summary[name] = "skipped"; continue
+            status = "failed"
+            for attempt in (1, 2):
+                log(f"start {name} (attempt {attempt}): {line}")
+                rc = subprocess.call(line, shell=True)
+                if rc == 0:
+                    status = "ok"; log(f"ok {name}"); break
+                log(f"exit {rc} for {name}")
+            summary[name] = status
     return summary
 
 

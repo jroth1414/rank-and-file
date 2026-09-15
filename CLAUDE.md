@@ -146,8 +146,8 @@ Everything below was measured on this machine with `scripts/env_check.py`.
   The fp32 logits for cross-entropy are the largest single tensor at 32k vocab;
   compile fuses much of that, and a chunked loss is the fallback.
 - **Sleep/restart:** AC sleep and hibernate timeouts are 0 (never). Windows
-  Update active hours are 11:00–05:00, so an automatic restart can land
-  between 05:00 and 11:00. Before a multi-day run, pause updates
+  Update active hours are 10:00–02:00 (checked 2026-09-15), so an automatic restart can land
+  between 02:00 and 10:00. Before a multi-day run, pause updates
   (Settings → Windows Update → Pause) or extend active hours.
 - **TDR** (GPU watchdog) is at the 2 s default. Training kernels are ms-scale;
   if a Newton–Schulz or loss kernel ever trips it, raise `TdrDelay` rather than

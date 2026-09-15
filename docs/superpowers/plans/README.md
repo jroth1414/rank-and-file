@@ -10,7 +10,7 @@ fresh context without reading the others. Execute in order; each plan's
 | 1 | `2026-09-02-01-model-and-tokenizer.md` | `rankfile/config.py`, `rankfile/model.py`, `rankfile/tokenizer.py`, `configs/model/*.yaml`, `scripts/train_tokenizer.py` | — |
 | 2 | `2026-09-02-02-data-pipeline.md` | `rankfile/data.py`, `scripts/prepare_data.py`, tokenized shards in `data/` | 1 |
 | 3 | `2026-09-02-03-optimizers-and-schedule.md` | `rankfile/optim/muon.py`, `rankfile/optim/build.py`, `rankfile/schedule.py` | 1 |
-| 4 | `2026-09-02-04-pretraining-loop.md` | `rankfile/checkpoint.py`, `rankfile/train.py`, `scripts/queue.py`, `configs/train/*.yaml`, m30 smoke run | 1, 2, 3 |
+| 4 | `2026-09-02-04-pretraining-loop.md` | `rankfile/checkpoint.py`, `rankfile/train.py`, `scripts/run_queue.py`, `configs/train/*.yaml`, m30 smoke run | 1, 2, 3 |
 | 5 | `2026-09-02-05-lora-and-finetuning.md` | `rankfile/lora.py`, `rankfile/tasks.py`, `rankfile/finetune.py`, `scripts/prepare_code.py`, `configs/finetune/*.yaml` | 1, 2, 4 |
 | 6 | `2026-09-02-06-spectral-analysis-and-plots.md` | `rankfile/spectra.py`, `scripts/analyze.py`, `scripts/plot.py` | 4, 5 |
 

@@ -4,7 +4,7 @@
 
 **Goal:** `python -m rankfile.train` trains any arm from a model config plus a train config, with gradient accumulation, WSD schedule, JSONL metrics, periodic validation, hourly resumable checkpoints, a memory-ceiling guard, and `torch.compile`; plus a sequential run queue and the arm configs.
 
-**Architecture:** `checkpoint.py` owns the on-disk format (model + optimizers + step + data position + RNG). `train.py` owns `TrainConfig`, the loop, evaluation, and the CLI. `scripts/queue.py` runs a text file of commands sequentially, skipping runs whose `DONE` marker exists. The loop builds the FlexAttention block mask outside the compiled loss so compile sees a plain tensor argument.
+**Architecture:** `checkpoint.py` owns the on-disk format (model + optimizers + step + data position + RNG). `train.py` owns `TrainConfig`, the loop, evaluation, and the CLI. `scripts/run_queue.py` runs a text file of commands sequentially, skipping runs whose `DONE` marker exists. The loop builds the FlexAttention block mask outside the compiled loss so compile sees a plain tensor argument.
 
 **Tech Stack:** torch 2.14 (`torch.compile`, autocast bf16, `clip_grad_norm_`), pyyaml, pytest.
 
@@ -713,11 +713,11 @@ git commit -m "train: arm, sweep, and smoke configs; m30 end-to-end GPU smoke te
 ### Task 6: m124 throughput check and run queue
 
 **Files:**
-- Create: `scripts/queue.py`, `configs/queue/sweep.txt`, `configs/queue/core.txt`
+- Create: `scripts/run_queue.py`, `configs/queue/sweep.txt`, `configs/queue/core.txt`
 - Test: `tests/test_queue.py`
 
 **Interfaces:**
-- Produces: `python scripts/queue.py configs/queue/sweep.txt` runs each non-comment line as a shell command in order; parses `--name X` from the line; skips if `runs/X/DONE` exists; on non-zero exit retries once (the run resumes from its checkpoint) and then moves on, logging to `runs/queue.log`.
+- Produces: `python scripts/run_queue.py configs/queue/sweep.txt` runs each non-comment line as a shell command in order; parses `--name X` from the line; skips if `runs/X/DONE` exists; on non-zero exit retries once (the run resumes from its checkpoint) and then moves on, logging to `runs/queue.log`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -725,7 +725,7 @@ git commit -m "train: arm, sweep, and smoke configs; m30 end-to-end GPU smoke te
 # tests/test_queue.py
 import sys
 from pathlib import Path
-from scripts.queue import run_queue
+from scripts.run_queue import run_queue
 
 def test_queue_skips_done_and_retries_once(tmp_path):
     (tmp_path / "runs" / "done_run").mkdir(parents=True); (tmp_path / "runs" / "done_run" / "DONE").write_text("x")
@@ -750,10 +750,10 @@ Expected: FAIL with `ModuleNotFoundError`
 - [ ] **Step 3: Implement**
 
 ```python
-# scripts/queue.py
+# scripts/run_queue.py
 """Run commands from a text file sequentially; skip DONE runs; retry once on failure.
 
-Usage: python scripts/queue.py configs/queue/core.txt
+Usage: python scripts/run_queue.py configs/queue/core.txt
 Each line: a full command containing --name <run_name>. Lines starting with # are ignored.
 """
 from __future__ import annotations
@@ -845,7 +845,7 @@ Expected: the last `metrics.jsonl` line shows `tok_per_s` ≥ 60,000 and `mem_gi
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/queue.py configs/queue/ tests/test_queue.py
+git add scripts/run_queue.py configs/queue/ tests/test_queue.py
 git commit -m "train: sequential run queue with DONE skipping and one retry; sweep and core queues"
 ```
 
@@ -855,7 +855,7 @@ git commit -m "train: sequential run queue with DONE skipping and one retry; swe
 
 - [ ] **Step 1:** Confirm with the user that `pytest` passes, the smoke test passed, and `data/fineweb_edu` is built (Plan 2 Task 4).
 - [ ] **Step 2:** Ask: "Launch the learning-rate sweep queue? Six runs of 200M tokens, roughly 5 to 8 hours total on the 5070 Ti. Pause Windows Update first."
-- [ ] **Step 3:** On approval: `.venv\Scripts\python.exe scripts/queue.py configs/queue/sweep.txt` (six runs of ~200M tokens, ~35 min each at the measured 95k tok/s, so ~4 h). When done, read each run's final `val_loss` from `DONE` and pick the best `peak_lr` per optimizer. **Edge rule:** if either optimizer's best is at a grid endpoint (1e-3 or 4e-3), add one point beyond it (5e-4 or 8e-3) and rerun that single point before freezing. Write the winners into `adamw.yaml`, `muon.yaml`, `p3_adamw.yaml`, and add a decision-log line in `CLAUDE.md` §11.
+- [ ] **Step 3:** On approval: `.venv\Scripts\python.exe scripts/run_queue.py configs/queue/sweep.txt` (six runs of ~200M tokens, ~35 min each at the measured 95k tok/s, so ~4 h). When done, read each run's final `val_loss` from `DONE` and pick the best `peak_lr` per optimizer. **Edge rule:** if either optimizer's best is at a grid endpoint (1e-3 or 4e-3), add one point beyond it (5e-4 or 8e-3) and rerun that single point before freezing. Write the winners into `adamw.yaml`, `muon.yaml`, `p3_adamw.yaml`, and add a decision-log line in `CLAUDE.md` §11.
 - [ ] **Step 4:** Ask: "Launch the core queue? P1 then P2 back to back, roughly 16 to 17 hours." On approval run `configs/queue/core.txt` (P1 and P2 only).
 - [ ] **Step 5:** After P2 finishes, read P2's final `val_loss` from its `DONE` file and P1's loss curve from `metrics.jsonl`. Choose P3's `total_tokens` so that an annealed AdamW run is expected to land at P2's final loss (extrapolate P1's stable-phase curve and add P1's measured anneal drop; 3.75B is the prior). Write it into `p3_adamw.yaml` (replacing the placeholder), add a decision-log line, then ask: "Launch P3? Roughly 11 to 13 hours." On approval run `configs/queue/core_p3.txt`. The sound comparison is P3-final versus P2-final, both annealed; intermediate P3 checkpoints sit at stable-phase LR and are not matched-loss substitutes.
 

@@ -839,7 +839,7 @@ if __name__ == "__main__":
 .venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 3e-3 --name ftsweep_lora16_lr3e-3
 ```
 
-Note: `scripts/queue.py` skips runs whose `DONE` file exists; fine-tune runs write `results.json` instead. Add to `queue.py`'s skip check: `or (runs_root / name / "results.json").exists()`. Update `tests/test_queue.py` accordingly (a run dir containing `results.json` is skipped).
+Note: `scripts/run_queue.py` skips runs whose `DONE` file exists; fine-tune runs write `results.json` instead. Add to `run_queue.py`'s skip check: `or (runs_root / name / "results.json").exists()`. Update `tests/test_queue.py` accordingly (a run dir containing `results.json` is skipped).
 
 - [ ] **Step 4: Run tests**
 
@@ -849,7 +849,7 @@ Expected: all passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add configs/finetune/ scripts/ft_grid.py configs/queue/ft_sweep.txt tests/test_ft_grid.py scripts/queue.py tests/test_queue.py
+git add configs/finetune/ scripts/ft_grid.py configs/queue/ft_sweep.txt tests/test_ft_grid.py scripts/run_queue.py tests/test_queue.py
 git commit -m "ft: fine-tuning configs, LR sweep queue, and grid generator"
 ```
 
@@ -858,7 +858,7 @@ git commit -m "ft: fine-tuning configs, LR sweep queue, and grid generator"
 ### Task 6: Launch gate (no code)
 
 - [ ] **Step 1:** Requires `runs/p1_adamw_m124_s0/DONE` (Plan 4 Task 7). Run a GPU smoke: `.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 1e-3 --name ft_smoke --set train_tokens=2097152` and confirm `results.json` appears and `mem_gib` in metrics stays under 14. Delete `runs/ft_smoke`.
-- [ ] **Step 2:** Ask the user: "Launch the fine-tuning LR sweep (6 runs, ~4 hours)?" On approval run `scripts/queue.py configs/queue/ft_sweep.txt`. Pick the lr with the lowest `after.code_val_loss` per method; write into `configs/finetune/full.yaml` and `lora.yaml`; add a decision-log line.
+- [ ] **Step 2:** Ask the user: "Launch the fine-tuning LR sweep (6 runs, ~4 hours)?" On approval run `scripts/run_queue.py configs/queue/ft_sweep.txt`. Pick the lr with the lowest `after.code_val_loss` per method; write into `configs/finetune/full.yaml` and `lora.yaml`; add a decision-log line.
 - [ ] **Step 3:** Generate the grid: `.venv\Scripts\python.exe scripts/ft_grid.py --parents runs/p1_adamw_m124_s0 runs/p2_muon_m124_s0 runs/p3_adamw_m124_s0 --out configs/queue/ft_core.txt`. Ask: "Launch the 24-run fine-tuning grid (~9 to 15 hours)?" On approval run it.
 
 ---

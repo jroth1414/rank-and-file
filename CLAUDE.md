@@ -191,7 +191,7 @@ rank-and-file/
 ├── scripts/
 │   ├── prepare_data.py     download + tokenize FineWeb-Edu into shards
 │   ├── train_tokenizer.py
-│   ├── queue.py            sequential run queue with resume
+│   ├── run_queue.py        sequential run queue with resume (not queue.py: it would shadow the stdlib)
 │   ├── analyze.py          runs spectra over a set of checkpoints → CSV
 │   └── plot.py             every paper figure is generated here, never by hand
 ├── tests/                  pytest; see §7

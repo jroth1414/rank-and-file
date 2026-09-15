@@ -1,6 +1,6 @@
 import sys
 
-from scripts.queue import run_queue
+from scripts.run_queue import run_queue
 
 
 def test_queue_skips_done_and_retries_once(tmp_path):

@@ -1,6 +1,6 @@
 """Run commands from a text file sequentially; skip DONE runs; retry once on failure.
 
-Usage: python scripts/queue.py configs/queue/core.txt
+Usage: python scripts/run_queue.py configs/queue/core.txt
 Each line: a full command containing --name <run_name>. Lines starting with # are ignored.
 """
 from __future__ import annotations

@@ -5,3 +5,6 @@
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr1e-3 --set peak_lr=1e-3
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr2e-3 --set peak_lr=2e-3
 .venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr4e-3 --set peak_lr=4e-3
+# Edge-winner extension (2026-09-15): both optimizers' best was 4e-3, the top of the grid, so one point beyond it per CLAUDE.md §3 rule 4 / Plan 4 Ruling H.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr8e-3 --set peak_lr=8e-3
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr8e-3 --set peak_lr=8e-3

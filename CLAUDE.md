@@ -364,6 +364,21 @@ Append, never rewrite. Format: date, decision, reason.
   cuDNN SDPA is used instead. Global Python's torch is broken (no sympy); the
   project uses `.venv` via uv. Micro-batch capped at 8 because WDDM pages to
   system RAM instead of OOM-ing.
+- **2026-09-28** — **Peak LR frozen at 4e-3 for both optimizers** (P1, P2, P3).
+  Sweep: seed 0, m124, 200M tokens (381 steps), final val_loss:
+  AdamW 1e-3 4.9286 | 2e-3 5.0774 | 4e-3 **4.8828** | 8e-3 5.2503;
+  Muon 1e-3 3.8017 | 2e-3 3.6843 | 4e-3 **3.6567** | 8e-3 3.6931.
+  4e-3 was the top edge of the first grid for both, so one point beyond it
+  (8e-3) was run; it lost for both, so 4e-3 is interior. The AdamW response is
+  non-monotonic (2e-3 is worse than both 1e-3 and 4e-3 by 0.15–0.19) and
+  nearly flat early (val at step 48: 6.94 / 6.97 / 6.99 for 1e-3 / 2e-3 / 4e-3);
+  the curves are smooth, grad norm 0.1–0.6, clipping never binds, and the
+  optimizer code routes the scheduled LR correctly, so this is read as a
+  short-horizon sweep effect, not a bug. Muon's warmup has grad-norm spikes
+  (23.1 at step 10 for 1e-3), absorbed by clipping at 1.0. At 200M tokens Muon
+  leads AdamW by 1.23 in val_loss (3.66 vs 4.88), so P3's token budget may
+  far exceed the 3.75B prior; it is sized from P1's curve after P2 finishes.
+  All runs: no non-finite values, peak allocated ≤ 8.23 GiB.
 
 ## 12. Key references (full list in proposal.md)
 

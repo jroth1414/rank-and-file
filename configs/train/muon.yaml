@@ -1,8 +1,8 @@
-# configs/train/muon.yaml — arm P2. Identical to adamw.yaml except optimizer. peak_lr is the sweep placeholder; replace with the sweep winner.
+# configs/train/muon.yaml — arm P2. Identical to adamw.yaml except optimizer. peak_lr frozen at the seed-0 200M-token sweep winner (CLAUDE.md §11, 2026-09-28).
 name: ""
 arm: p2
 optimizer: muon
-peak_lr: 2.0e-3
+peak_lr: 4.0e-3
 weight_decay: 0.1
 beta1: 0.9
 beta2: 0.95

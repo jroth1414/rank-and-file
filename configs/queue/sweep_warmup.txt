@@ -1,0 +1,3 @@
+# configs/queue/sweep_warmup.txt — warmup diagnostic (2026-09-29): 8-step warmup (0.02 of 381) is suspected of handicapping AdamW. 2 x 200M tokens, ~36 min each.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr4e-3_wu10 --set peak_lr=4e-3 --set warmup_frac=0.10
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr4e-3_wu10 --set peak_lr=4e-3 --set warmup_frac=0.10

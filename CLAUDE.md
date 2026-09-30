@@ -379,6 +379,23 @@ Append, never rewrite. Format: date, decision, reason.
   leads AdamW by 1.23 in val_loss (3.66 vs 4.88), so P3's token budget may
   far exceed the 3.75B prior; it is sized from P1's curve after P2 finishes.
   All runs: no non-finite values, peak allocated ≤ 8.23 GiB.
+- **2026-09-30** — **AdamW-baseline diagnostics: frozen config kept** (LR 4e-3,
+  2% warmup, β₂ 0.95). At matched stable-phase train loss Muon is 1.7× faster
+  by step 50 and 3.0–3.3× by steps 200–300, against the 1.4× Wen et al. 2025
+  (arXiv:2509.02046) report at 130M for a fully tuned AdamW, so the AdamW twin
+  was checked for a handicap. Checkpoints show none in the code: AdamW moves
+  the hidden matrices as far as Muon (weight RMS 0.043–0.054 vs 0.050–0.082),
+  median √v̂ is 180× ε, RMS of m̂/√v̂ is 0.23 in both arms; what differs is
+  ΔW effective rank (layer 3: AdamW 94–487, Muon 241–721). Two one-variable
+  tests, seed 0, 200M tokens, LR 4e-3, applied to both arms per §3 rule 4:
+  warmup 0.02 → 0.10 (8 → 38 steps): AdamW 4.8828 → 4.8557, Muon 3.6567 →
+  3.6797; AdamW-group β₂ 0.95 → 0.98: AdamW 4.8828 → 4.9382, Muon 3.6567 →
+  3.6657. Neither closes more than 0.05 of the 1.23 gap, so the gap is read
+  as Muon's genuine advantage at this short horizon (381 steps, ~0.08×
+  Chinchilla tokens), where Wen et al. also find the largest speedups.
+  P1/P2 at 2.5B tokens measure whether it shrinks; P3's design is decided
+  after P2 (options: size AdamW to P2's loss, cap at 5B, or loss-match with a
+  short Muon run). Grad clip (1.0) and weight decay were not tested.
 
 ## 12. Key references (full list in proposal.md)
 

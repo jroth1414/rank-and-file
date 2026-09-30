@@ -1,0 +1,3 @@
+# configs/queue/sweep_beta2.txt — AdamW beta2 diagnostic (2026-09-30): 0.95 -> 0.98 for the AdamW groups in both arms (Muon momentum unchanged). 2 x 200M tokens, ~36 min each.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_adamw.yaml --seed 0 --name sweep_adamw_lr4e-3_b98 --set peak_lr=4e-3 --set beta2=0.98
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/sweep_muon.yaml --seed 0 --name sweep_muon_lr4e-3_b98 --set peak_lr=4e-3 --set beta2=0.98

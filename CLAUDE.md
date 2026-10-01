@@ -396,6 +396,20 @@ Append, never rewrite. Format: date, decision, reason.
   P1/P2 at 2.5B tokens measure whether it shrinks; P3's design is decided
   after P2 (options: size AdamW to P2's loss, cap at 5B, or loss-match with a
   short Muon run). Grad clip (1.0) and weight decay were not tested.
+- **2026-09-30** — **Correction to the entry above: warmup does matter for
+  AdamW, and the 200M-token sweep under-represents it.** P1 s0 (2.5B schedule,
+  95-step warmup) and `sweep_adamw_lr4e-3` (8-step warmup) share data order,
+  model, LR and everything else; at step 190 P1's train loss is 5.509 vs 5.855
+  (38-step warmup: 5.942), and P1's val_loss at 150M tokens (4.883, still at
+  peak LR) equals the sweep run's final annealed 200M value (4.8828). The
+  response is non-monotonic over 8/38/95 steps and not yet explained. So the
+  "genuine short-horizon gap" reading is withdrawn, and 4e-3 was chosen under
+  a warmup the real runs do not use. Decision: P1/P2 continue unchanged; they
+  share an identical schedule, so their gap is the fair measurement. If it
+  remains far above ~1.4×, check AdamW LR on the real schedule (2e-3, 8e-3,
+  truncated at ~500M tokens and compared step-matched against P1's stable
+  phase) before sizing P3. Lesson: sweep warmup in absolute steps, not as a
+  fraction of a 12× shorter run.
 
 ## 12. Key references (full list in proposal.md)
 

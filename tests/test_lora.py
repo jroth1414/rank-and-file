@@ -47,3 +47,12 @@ def test_merge_restores_each_params_prior_requires_grad():
     merge_lora(m)
     assert not m.embed.weight.requires_grad  # restored, not blanket-set to True
     assert m.blocks[0].attn.q.weight.requires_grad  # was trainable before LoRA, stays so
+
+
+def test_adapter_params_follow_base_device():
+    # apply_lora runs after the parent model is moved to CUDA; adapters created on the
+    # default (CPU) device made every LoRA forward fail with a device mismatch.
+    base = torch.nn.Linear(8, 4, bias=False, device="meta")
+    w = LoRALinear(base, r=2, alpha=4.0)
+    assert w.A.device == base.weight.device
+    assert w.B.device == base.weight.device

@@ -14,9 +14,13 @@ class LoRALinear(nn.Module):
         super().__init__()
         self.base = base
         self.r, self.scale = r, alpha / r
-        self.A = nn.Parameter(torch.empty(r, base.in_features))
-        self.B = nn.Parameter(torch.zeros(base.out_features, r))
-        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+        # Init on CPU so A's values do not depend on the device, then follow the base
+        # layer: apply_lora runs after the parent is already on CUDA.
+        A = torch.empty(r, base.in_features)
+        nn.init.kaiming_uniform_(A, a=math.sqrt(5))
+        dev = base.weight.device
+        self.A = nn.Parameter(A.to(dev))
+        self.B = nn.Parameter(torch.zeros(base.out_features, r, device=dev))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.base(x) + (x @ self.A.T @ self.B.T) * self.scale

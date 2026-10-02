@@ -424,6 +424,15 @@ Append, never rewrite. Format: date, decision, reason.
   undershooting; 4.5B would also exceed the 4.20B train tokens on disk).
   P3's 2% warmup is 153 steps vs 95 for P1/P2 (fixed-fraction schedule per
   proposal §4). Both runs: no non-finite values, peak 8.23 / 7.95 GiB, ~97k tok/s.
+- **2026-10-02** — **P3 s0 complete: val_loss 3.0128 at 4.0B tokens**, 0.0245
+  *below* P2 s0 (3.0373), so the matched-loss twin slightly overshoots rather
+  than matches. The sizing fit was mildly pessimistic: stable-phase val_loss
+  at P3's decay start (3.2B) was 3.1949 vs the predicted 3.2081, and P3's anneal
+  drop was 0.182 vs P1's 0.171. Kept as is, not re-run: H1 is read on the
+  `--all-ckpts` effective-rank-vs-loss trajectory, where loss matching is done
+  across checkpoints, and the final-checkpoint comparison P2 vs P3 is reported
+  with both losses. Muon's end-of-run token advantage is therefore < 4.0/2.5 =
+  1.6×. No non-finite values, peak 8.23 GiB, 97k tok/s, 16 checkpoints.
 
 ## 12. Key references (full list in proposal.md)
 

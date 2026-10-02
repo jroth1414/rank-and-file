@@ -410,6 +410,20 @@ Append, never rewrite. Format: date, decision, reason.
   truncated at ~500M tokens and compared step-matched against P1's stable
   phase) before sizing P3. Lesson: sweep warmup in absolute steps, not as a
   fraction of a 12× shorter run.
+- **2026-10-01** — **P1 s0 and P2 s0 complete; P3 sized at 4.0B tokens.**
+  Final val_loss (seed 0, m124, 2.5B tokens, identical schedule): P1 AdamW
+  **3.0939**, P2 Muon **3.0373** (gap 0.057). The gap shrinks monotonically:
+  1.164 at 100M, 0.257 at 400M, 0.116 at 1.0B, 0.068 at 2.0B. Stable-phase
+  matched-loss speedup of Muon over AdamW is 1.75–2.1× (≈1.8× after step 500),
+  vs 1.4× reported by Wen et al. at 130M against a fully tuned AdamW, so no
+  AdamW LR re-check before P3: P3 reaches matched loss whatever its LR costs
+  in tokens. P3 sizing: power-law fits to P1's stable-phase val_loss (fit
+  start 0.3/0.5/0.8/1.0B) plus P1's measured anneal drop (0.171, from 3.2647
+  at decay start to 3.0939) give 4.12/3.91/3.77/3.83B; the 1.8× speedup
+  heuristic gives 4.5B. Chose **4.0B** (above the fit median to avoid
+  undershooting; 4.5B would also exceed the 4.20B train tokens on disk).
+  P3's 2% warmup is 153 steps vs 95 for P1/P2 (fixed-fraction schedule per
+  proposal §4). Both runs: no non-finite values, peak 8.23 / 7.95 GiB, ~97k tok/s.
 
 ## 12. Key references (full list in proposal.md)
 

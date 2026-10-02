@@ -1,4 +1,4 @@
-# arm P3. peak_lr frozen at AdamW's seed-0 sweep winner (CLAUDE.md §11, 2026-09-28); total_tokens is a placeholder set from P2's final val_loss before launch (see Plan 4 Task 7 Step 5).
+# arm P3. peak_lr frozen at AdamW's seed-0 sweep winner (CLAUDE.md §11, 2026-09-28); total_tokens sized from P1's curve to reach P2's final val_loss 3.0373 (CLAUDE.md §11, 2026-10-01).
 name: ""
 arm: p3
 optimizer: adamw
@@ -6,7 +6,7 @@ peak_lr: 4.0e-3
 weight_decay: 0.1
 beta1: 0.9
 beta2: 0.95
-total_tokens: 3750000000
+total_tokens: 4000000000
 batch_tokens: 524288
 micro_batch: 8
 seq_len: 2048

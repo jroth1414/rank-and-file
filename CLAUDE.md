@@ -433,6 +433,17 @@ Append, never rewrite. Format: date, decision, reason.
   across checkpoints, and the final-checkpoint comparison P2 vs P3 is reported
   with both losses. Muon's end-of-run token advantage is therefore < 4.0/2.5 =
   1.6×. No non-finite values, peak 8.23 GiB, 97k tok/s, 16 checkpoints.
+- **2026-10-02** — **H1 supported on seed 0.** Mean normalized effective rank
+  over all 84 block matrices, final checkpoints: P1 0.822 (val 3.094), P2
+  **0.875** (3.037), P3 **0.837** (3.013); P2 − P3 = +0.038 although P3 has the
+  lower loss. P2 > P3 in all seven module types (+0.013 mlp.down to +0.068
+  attn.q). Stable rank differs more: mlp.gate 161.5 vs 32.4, mlp.up 187.0 vs
+  104.0, attn.q 51.1 vs 16.9, attn.o 117.2 vs 70.3. On the checkpoint
+  trajectory at matched val_loss ≈3.207: P2 0.880 vs P3 0.833. Caveat for the
+  paper: the gap narrows with training. AdamW's effective rank rises
+  monotonically (P3 0.717 at val 3.954 → 0.837), Muon's falls slightly
+  (0.894 at 3.648 → 0.875), so longer training may shrink the H1 effect.
+  Single seed; seed 1 is needed before calling it robust.
 
 ## 12. Key references (full list in proposal.md)
 

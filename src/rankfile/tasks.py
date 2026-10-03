@@ -87,13 +87,16 @@ def collate_sup(
 
 
 def sup_loss(model, ids: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    """Next-token loss on positions whose *target* is a label token."""
-    logits = model(ids[:, :-1]).float()
-    tgt, m = ids[:, 1:], mask[:, 1:].float()
-    nll = F.cross_entropy(
-        logits.reshape(-1, logits.shape[-1]), tgt.reshape(-1), reduction="none",
-    ).view_as(m)
-    return (nll * m).sum() / m.sum().clamp(min=1)
+    """Next-token loss on positions whose *target* is a label token.
+
+    Only those positions are projected to the vocabulary: full [B,T,V] logits at
+    sup_batch 32 x 512 are ~2 GiB fp32 and pushed full fine-tuning past the memory ceiling.
+    """
+    h = model.hidden(ids[:, :-1])
+    m = mask[:, 1:].bool()
+    logits = F.linear(h[m], model.lm_head_weight()).float()
+    nll = F.cross_entropy(logits, ids[:, 1:][m], reduction="sum")
+    return nll / m.sum().clamp(min=1)
 
 
 @torch.no_grad()

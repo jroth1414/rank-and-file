@@ -1,0 +1,3 @@
+# configs/queue/ft_sweep_edge.txt — edge-winner extension (2026-10-03): full code (best 3e-4) and LoRA r16 code (best 3e-3) both won at the top of their grids; one point beyond each.
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --lr 1e-3 --name ftsweep_full_code_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 16 --lr 1e-2 --name ftsweep_lora16_code_lr1e-2

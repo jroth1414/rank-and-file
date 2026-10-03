@@ -444,6 +444,27 @@ Append, never rewrite. Format: date, decision, reason.
   monotonically (P3 0.717 at val 3.954 → 0.837), Muon's falls slightly
   (0.894 at 3.648 → 0.875), so longer training may shrink the H1 effect.
   Single seed; seed 1 is needed before calling it robust.
+- **2026-10-03** — **Fine-tuning LRs frozen** (swept on P1 s0, reused on every
+  twin): full code **1e-3**, full sup **1e-4**, LoRA code **1e-2**, LoRA sup
+  **1e-3** (LoRA swept at r16; alpha = 2r keeps the scale fixed across ranks).
+  Code val loss (from 2.0158), forgetting in parentheses: full 3e-5 1.2413
+  (+0.055), 1e-4 1.1053 (+0.123), 3e-4 0.9929 (+0.251), 1e-3 0.8970 (+0.635);
+  LoRA r16 3e-4 1.3040 (+0.104), 1e-3 1.1684 (+0.211), 3e-3 1.0768 (+0.431),
+  1e-2 1.0577 (+0.826). Sup accuracy (from 0.6215): full 3e-5 0.8177, 1e-4
+  0.8336, 3e-4 0.8302; LoRA r16 3e-4 0.8184, 1e-3 0.8245, 3e-3 0.7259
+  (diverged, forgetting +20.3). Both code winners stayed at the top edge after
+  one extension each (user chose to freeze rather than extend again): **full
+  code is unbracketed**, LoRA code is flattening (−0.019 for 3.3×). Code CPT
+  selected by target loss alone trades heavily into forgetting; the rule is
+  the same for every twin, so H3 is unaffected, and forgetting is reported as
+  its own outcome. Two engineering fixes made during the sweep: LoRA adapters
+  were created on CPU after the parent moved to CUDA (every GPU LoRA forward
+  failed; fixed in lora.py), and sup_loss built full [32,511,32768] logits,
+  pushing full-FT sup to 14.5 GiB past the guard (now projects only label
+  positions; 8.66 GiB). `ftsweep_full_sup_lr3e-5` holds two guard-stopped
+  attempts and was re-run as `_r2`; `ftsweep_full_sup_lr1e-4` ran the fixed
+  sup_loss but its git.txt records the prior commit e9a5e12 (the fix was
+  uncommitted for ~1 min).
 
 ## 12. Key references (full list in proposal.md)
 

@@ -1,0 +1,2 @@
+# configs/queue/ft_sweep_rerun.txt — re-run of ftsweep_full_sup_lr3e-5 after the sup_loss memory fix (08ffa18); the original dir holds two guard-stopped attempts and is kept as a record.
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task sup --lr 3e-5 --name ftsweep_full_sup_lr3e-5_r2

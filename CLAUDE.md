@@ -465,6 +465,28 @@ Append, never rewrite. Format: date, decision, reason.
   attempts and was re-run as `_r2`; `ftsweep_full_sup_lr1e-4` ran the fixed
   sup_loss but its git.txt records the prior commit e9a5e12 (the fix was
   uncommitted for ~1 min).
+- **2026-10-03** — **Seed-0 fine-tuning grid complete (24/24). H2 is
+  contradicted; H3 is weak on code, directionally supported on sup, and its
+  "gap closes with rank" clause is contradicted; LoRA r64 diverged on code.**
+  *H2:* mean normalized effective rank of full-FT ΔW is *lower* on the Muon
+  twin than on loss-matched AdamW: code P2 0.757 vs P3 0.776 (P1 0.761); sup
+  P2 0.663 vs P3 0.686 (P1 0.666). Stable rank too: code 34.2 vs 46.4, sup 8.2
+  vs 13.5; top-r energy is *higher* on P2 (code top16 0.268 vs 0.228; sup
+  0.514 vs 0.436). Muon's flatter pretrained spectra (H1) do not carry over to
+  a higher-rank update. *H3* (LoRA recovered fraction, P2 vs P3): code r4
+  0.744 vs 0.754, r16 0.841 vs 0.852 (P2 lower by ~0.01, single seed, likely
+  within noise); sup r4 0.955 vs 0.983, r16 0.966 vs 1.031, r64 0.903 vs
+  1.001 (P2 lower by 0.028–0.098, but the gap *grows* with rank). Since P2's
+  ΔW is more concentrated yet LoRA recovers less on it, the top-r-energy
+  predictor points the wrong way on seed 0. *Forgetting:* full-FT sup forgets
+  far more on P2 (+1.256) than P3 (+0.251) or P1 (+0.280) at the same LR.
+  *r64 divergence:* LoRA r64 code at the frozen LR 1e-2 (chosen at r16) got
+  worse than the base model on all three parents (code val loss 2.670 /
+  3.097 / 3.232 from ~1.95–2.02, forgetting +4.7 to +5.7); r64 sup kept
+  accuracy but forgot +2.0 to +4.9. With α = 2r the scale is fixed but ‖BA‖
+  grows with r, so r64 takes larger steps than r16 at one LR; the r64 code
+  cells are not usable for H3 as run. sup accuracy is on 1,000 eval examples
+  per task (SE ≈ 1.2 pt per task).
 
 ## 12. Key references (full list in proposal.md)
 

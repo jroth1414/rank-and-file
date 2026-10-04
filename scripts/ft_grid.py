@@ -11,9 +11,15 @@ def grid_lines(
     parents: list[str],
     ranks: list[int],
     tasks: list[str],
-    lrs: dict[tuple[str, str], float],
+    lrs: dict[tuple[str, str], float | dict[int, float]],
     py: str,
 ) -> list[str]:
+    """A LoRA entry in `lrs` is one LR for every rank or a {rank: lr} map."""
+
+    def lora_lr(task: str, r: int) -> float:
+        v = lrs[("lora", task)]
+        return v[r] if isinstance(v, dict) else v
+
     lines = []
     for parent in parents:
         pname = Path(parent).name
@@ -25,9 +31,18 @@ def grid_lines(
             for r in ranks:
                 lines.append(
                     f"{py} -m rankfile.finetune --parent {parent} --method lora --task {task} "
-                    f"--rank {r} --lr {lrs[('lora', task)]} --name {pname}__lora{r}_{task}"
+                    f"--rank {r} --lr {lora_lr(task, r)} --name {pname}__lora{r}_{task}"
                 )
     return lines
+
+
+def _lora_lrs(task: str) -> float | dict[int, float]:
+    # lora_{task}.yaml was used by the first grid and is immutable (CLAUDE.md §8 rule 3);
+    # per-rank LRs from the rank sweep live in a separate file that takes precedence.
+    by_rank = Path(f"configs/finetune/lora_{task}_by_rank.yaml")
+    if by_rank.exists():
+        return {int(r): float(lr) for r, lr in load_yaml(by_rank)["lr_by_rank"].items()}
+    return load_yaml(f"configs/finetune/lora_{task}.yaml")["lr"]
 
 
 def main() -> None:
@@ -40,8 +55,8 @@ def main() -> None:
     lrs = {
         ("full", "code"): load_yaml("configs/finetune/full_code.yaml")["lr"],
         ("full", "sup"): load_yaml("configs/finetune/full_sup.yaml")["lr"],
-        ("lora", "code"): load_yaml("configs/finetune/lora_code.yaml")["lr"],
-        ("lora", "sup"): load_yaml("configs/finetune/lora_sup.yaml")["lr"],
+        ("lora", "code"): _lora_lrs("code"),
+        ("lora", "sup"): _lora_lrs("sup"),
     }
     lines = grid_lines(a.parents, a.ranks, a.tasks, lrs, ".venv\\Scripts\\python.exe")
     Path(a.out).write_text(

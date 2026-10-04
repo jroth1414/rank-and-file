@@ -27,3 +27,20 @@ def test_grid_lines_cover_all_cells():
         in l
         for l in lines
     )
+
+
+def test_grid_lines_use_per_rank_lora_lr():
+    # LoRA r64 diverged on code at the LR chosen at r16, so each rank gets its own LR.
+    lrs = {
+        ("full", "code"): 1e-3,
+        ("full", "sup"): 1e-4,
+        ("lora", "code"): {4: 3e-2, 16: 1e-2, 64: 1e-3},
+        ("lora", "sup"): 1e-3,
+    }
+    lines = grid_lines(
+        ["runs/p3_adamw_m124_s0"], ranks=[4, 16, 64], tasks=["code", "sup"], lrs=lrs,
+        py=".venv\Scripts\python.exe",
+    )
+    assert "--rank 4 --lr 0.03 --name p3_adamw_m124_s0__lora4_code" in "\n".join(lines)
+    assert "--rank 64 --lr 0.001 --name p3_adamw_m124_s0__lora64_code" in "\n".join(lines)
+    assert "--rank 64 --lr 0.001 --name p3_adamw_m124_s0__lora64_sup" in "\n".join(lines)

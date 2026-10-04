@@ -1,0 +1,10 @@
+# configs/queue/ft_sweep_rank.txt — per-rank LoRA LR sweep on P1 s0 (2026-10-04): r64 code diverged at the r16-chosen LR. 3-point grids per (rank, task); points already run as P1 grid cells (r4 code 1e-2, r4 sup 1e-3, r64 sup 1e-3) are reused, not re-run.
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 4 --lr 3e-3 --name ftsweep_lora4_code_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 4 --lr 3e-2 --name ftsweep_lora4_code_lr3e-2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 64 --lr 3e-4 --name ftsweep_lora64_code_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 64 --lr 1e-3 --name ftsweep_lora64_code_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task code --rank 64 --lr 3e-3 --name ftsweep_lora64_code_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task sup --rank 4 --lr 3e-4 --name ftsweep_lora4_sup_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task sup --rank 4 --lr 3e-3 --name ftsweep_lora4_sup_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task sup --rank 64 --lr 1e-4 --name ftsweep_lora64_sup_lr1e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method lora --task sup --rank 64 --lr 3e-4 --name ftsweep_lora64_sup_lr3e-4

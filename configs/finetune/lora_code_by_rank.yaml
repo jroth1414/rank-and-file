@@ -1,0 +1,5 @@
+# Per-rank LoRA LR for code, from the P1 s0 rank sweep (CLAUDE.md §11, 2026-10-05). Supersedes lora_code.yaml (kept: the first grid used it).
+lr_by_rank:
+  4: 1.0e-2
+  16: 1.0e-2
+  64: 3.0e-3

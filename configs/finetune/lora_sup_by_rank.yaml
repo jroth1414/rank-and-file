@@ -1,0 +1,5 @@
+# Per-rank LoRA LR for sup, from the P1 s0 rank sweep (CLAUDE.md §11, 2026-10-05). r4 keeps 1e-3 (3e-3 tied within 0.0002 at the grid edge, 4.7x the forgetting). Supersedes lora_sup.yaml (kept: the first grid used it).
+lr_by_rank:
+  4: 1.0e-3
+  16: 1.0e-3
+  64: 3.0e-4

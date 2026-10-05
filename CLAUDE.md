@@ -487,6 +487,22 @@ Append, never rewrite. Format: date, decision, reason.
   grows with r, so r64 takes larger steps than r16 at one LR; the r64 code
   cells are not usable for H3 as run. sup accuracy is on 1,000 eval examples
   per task (SE ≈ 1.2 pt per task).
+- **2026-10-05** — **LoRA LR is now swept per rank** (P1 s0; supersedes "LoRA
+  swept at r16" above), after r64 code diverged at the r16 LR. Code val loss
+  (forgetting): r4 3e-3 1.2035 (+0.285), **1e-2 1.1690** (+0.525), 3e-2 3.6912
+  (diverged); r64 3e-4 1.1972 (+0.152), 1e-3 1.0627 (+0.309), **3e-3 0.9868**
+  (+0.633), 1e-2 2.6702 (diverged). Sup accuracy (forgetting): r4 3e-4 0.8051
+  (+0.057), **1e-3 0.8258** (+0.210), 3e-3 0.8260 (+0.991); r64 1e-4 0.8190
+  (+0.104), **3e-4 0.8265** (+0.263), 1e-3 0.8184 (+2.080). Frozen: code
+  {4: 1e-2, 16: 1e-2, 64: 3e-3}, sup {4: 1e-3, 16: 1e-3, 64: 3e-4}, in
+  `configs/finetune/lora_{code,sup}_by_rank.yaml` (the original
+  `lora_{code,sup}.yaml` are kept: the first grid used them). r4 sup is a
+  deliberate tie-break: 3e-3 led 1e-3 by 0.0002 (noise, top edge) at 4.7×
+  the forgetting, so 1e-3 is kept (user decision). The six superseded r64
+  cells (P1/P2/P3 × code/sup) were moved, intact, to `runs/_superseded/`
+  with the user's permission and re-run under canonical names from
+  `configs/queue/ft_core_rank.txt`. The optimal LoRA LR falls with rank at
+  fixed α = 2r, consistent with ‖BA‖ growing with r.
 
 ## 12. Key references (full list in proposal.md)
 

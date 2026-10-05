@@ -503,6 +503,17 @@ Append, never rewrite. Format: date, decision, reason.
   with the user's permission and re-run under canonical names from
   `configs/queue/ft_core_rank.txt`. The optimal LoRA LR falls with rank at
   fixed α = 2r, consistent with ‖BA‖ growing with r.
+- **2026-10-05** — **H3 on seed 0 with per-rank LRs** (corrects the r64 cells
+  of the 2026-10-03 entry). LoRA recovered fraction, P2 vs P3: code r4 0.744
+  vs 0.754, r16 0.841 vs 0.852, r64 0.914 vs 0.918 (P2 lower by 0.010 /
+  0.011 / 0.004: the gap narrows at r64, as H3 predicts, but is ~1 pt at
+  most); sup r4 0.955 vs 0.983, r16 0.966 vs 1.031, r64 0.969 vs 1.005 (P2
+  lower by 0.028 / 0.065 / 0.036: larger, but not monotone in rank). So H3's
+  direction holds in all six rank × task cells on seed 0; its "closes with
+  rank" clause holds on code only. Sup forgetting is 2.6–3.9× higher on P2
+  than P3 for every method (full +1.256 vs +0.251; LoRA r4 +0.694 vs +0.180,
+  r16 +1.085 vs +0.431, r64 +0.579 vs +0.225). H2 stands as contradicted
+  (unchanged; full-FT runs were not re-run). Seed 1 is next.
 
 ## 12. Key references (full list in proposal.md)
 

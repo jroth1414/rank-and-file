@@ -1,0 +1,3 @@
+# configs/queue/core_s1.txt — P1 s1, P2 s1 (second seeds; seed controls init and data order). Same configs as core.txt.
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/adamw.yaml --seed 1 --name p1_adamw_m124_s1
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/muon.yaml --seed 1 --name p2_muon_m124_s1

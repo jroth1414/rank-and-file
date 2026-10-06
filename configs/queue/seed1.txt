@@ -1,0 +1,26 @@
+# configs/queue/seed1.txt — P3 s1 (same config as P3 s0, 4.0B tokens), then the seed-1 fine-tuning grid with the frozen per-rank LoRA LRs (lines from scripts/ft_grid.py).
+.venv\Scripts\python.exe -m rankfile.train --model configs/model/m124.yaml --train configs/train/p3_adamw.yaml --seed 1 --name p3_adamw_m124_s1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method full --task code --lr 0.001 --name p1_adamw_m124_s1__full_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task code --rank 4 --lr 0.01 --name p1_adamw_m124_s1__lora4_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task code --rank 16 --lr 0.01 --name p1_adamw_m124_s1__lora16_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task code --rank 64 --lr 0.003 --name p1_adamw_m124_s1__lora64_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method full --task sup --lr 0.0001 --name p1_adamw_m124_s1__full_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task sup --rank 4 --lr 0.001 --name p1_adamw_m124_s1__lora4_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task sup --rank 16 --lr 0.001 --name p1_adamw_m124_s1__lora16_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s1 --method lora --task sup --rank 64 --lr 0.0003 --name p1_adamw_m124_s1__lora64_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method full --task code --lr 0.001 --name p2_muon_m124_s1__full_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task code --rank 4 --lr 0.01 --name p2_muon_m124_s1__lora4_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task code --rank 16 --lr 0.01 --name p2_muon_m124_s1__lora16_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task code --rank 64 --lr 0.003 --name p2_muon_m124_s1__lora64_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method full --task sup --lr 0.0001 --name p2_muon_m124_s1__full_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task sup --rank 4 --lr 0.001 --name p2_muon_m124_s1__lora4_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task sup --rank 16 --lr 0.001 --name p2_muon_m124_s1__lora16_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s1 --method lora --task sup --rank 64 --lr 0.0003 --name p2_muon_m124_s1__lora64_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method full --task code --lr 0.001 --name p3_adamw_m124_s1__full_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task code --rank 4 --lr 0.01 --name p3_adamw_m124_s1__lora4_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task code --rank 16 --lr 0.01 --name p3_adamw_m124_s1__lora16_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task code --rank 64 --lr 0.003 --name p3_adamw_m124_s1__lora64_code
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method full --task sup --lr 0.0001 --name p3_adamw_m124_s1__full_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task sup --rank 4 --lr 0.001 --name p3_adamw_m124_s1__lora4_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task sup --rank 16 --lr 0.001 --name p3_adamw_m124_s1__lora16_sup
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s1 --method lora --task sup --rank 64 --lr 0.0003 --name p3_adamw_m124_s1__lora64_sup

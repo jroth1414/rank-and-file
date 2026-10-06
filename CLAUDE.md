@@ -514,6 +514,14 @@ Append, never rewrite. Format: date, decision, reason.
   than P3 for every method (full +1.256 vs +0.251; LoRA r4 +0.694 vs +0.180,
   r16 +1.085 vs +0.431, r64 +0.579 vs +0.225). H2 stands as contradicted
   (unchanged; full-FT runs were not re-run). Seed 1 is next.
+- **2026-10-05** — **Seed 1 pretraining replicates seed 0.** Final val_loss:
+  P1 s1 3.0936 (s0 3.0939), P2 s1 3.0350 (s0 3.0373); mean normalized
+  effective rank: P1 0.822 (0.822), P2 0.874 (0.875). Seed-to-seed spread
+  (≤0.0023 loss, ≤0.001 erank) is ~25–50× smaller than the P1–P2 gap
+  (0.057, 0.053). Both runs clean, peak 8.23 / 7.95 GiB. By user decision,
+  P3 s1 (same config as P3 s0, 4.0B tokens) and the full 24-run seed-1 grid
+  follow (`configs/queue/seed1.txt`), so the matched-loss comparison is
+  replicated rather than single-seed.
 
 ## 12. Key references (full list in proposal.md)
 

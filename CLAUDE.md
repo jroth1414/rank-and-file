@@ -522,6 +522,23 @@ Append, never rewrite. Format: date, decision, reason.
   P3 s1 (same config as P3 s0, 4.0B tokens) and the full 24-run seed-1 grid
   follow (`configs/queue/seed1.txt`), so the matched-loss comparison is
   replicated rather than single-seed.
+- **2026-10-07** — **Two-seed results. H1 supported; H2 contradicted; H3 not
+  supported; Muon twins forget more on sup.** P3 s1 val_loss 3.0199 (s0
+  3.0128). *H1* (mean erank_norm, P2 vs P3): s0 0.875 vs 0.837, s1 0.874 vs
+  0.835. *H2* (full-FT ΔW erank_norm, P2 vs P3): code s0 0.757 vs 0.776, s1
+  0.756 vs 0.773; sup s0 0.663 vs 0.686, s1 0.657 vs 0.673; stable rank code
+  34.2/33.9 vs 46.4/45.2, sup 8.2/8.0 vs 13.5/13.0; Muon's update is lower
+  rank and more concentrated on both seeds. *H3* (LoRA recovered fraction,
+  P2 vs P3, r4/r16/r64): code s0 0.744/0.841/0.914 vs 0.754/0.852/0.918, s1
+  0.757/0.850/0.919 vs 0.754/0.852/0.918; sup s0 0.955/0.966/0.969 vs
+  0.983/1.031/1.005, s1 0.971/0.984/1.005 vs 0.951/0.994/0.941. Seed 1
+  erases or reverses every seed-0 gap, so the seed-0 "direction holds in all
+  six cells" reading (2026-10-05) was noise: no evidence on two seeds that
+  LoRA recovers less on Muon twins. *Forgetting* (FineWeb-Edu val loss
+  increase, P2 vs P3): sup full FT s0 +1.256 vs +0.251, s1 +1.522 vs +0.270;
+  sup LoRA r16 s0 +1.085 vs +0.431, s1 +1.054 vs +0.391; code full FT
+  +0.683/+0.678 vs +0.615/+0.619. The forgetting gap is the largest
+  replicated fine-tuning effect in the study and was not hypothesized.
 
 ## 12. Key references (full list in proposal.md)
 

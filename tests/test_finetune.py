@@ -119,3 +119,38 @@ def test_bucketed_batches_cut_padding_versus_plain_permutation():
 
     assert sorted(j for b in bucketed for j in b) == sorted(j for b in unbucketed for j in b)
     assert padding_fraction(bucketed) < padding_fraction(unbucketed)
+
+
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
+def test_full_ft_with_muon_moves_weights_differently_from_adamw(tmp_path):
+    # Optimizer-mismatch control: a Muon twin fine-tuned with Muon. If the optimizer
+    # flag were ignored, both runs would produce identical weights.
+    run = _parent(tmp_path)
+    ad = finetune(_cfg(tmp_path, run, method="full", task="code", lr=3e-3), device="cpu")
+    mu = finetune(_cfg(tmp_path, run, method="full", task="code", lr=3e-3, optimizer="muon"),
+                  device="cpu")
+    r = json.loads((mu / "results.json").read_text())
+    assert mu.name == "parent__fullmuon_code" and r["optimizer"] == "muon"
+    assert r["after"]["code_val_loss"] < r["before"]["code_val_loss"]
+    a, m = torch.load(ad / "model.pt"), torch.load(mu / "model.pt")
+    assert not torch.equal(a["blocks.0.attn.q.weight"], m["blocks.0.attn.q.weight"])
+
+
+def test_muon_with_lora_is_rejected(tmp_path):
+    run = _parent(tmp_path)
+    with pytest.raises(ValueError, match="muon"):
+        finetune(_cfg(tmp_path, run, method="lora", rank=2, task="code", optimizer="muon"),
+                 device="cpu")
+
+
+@pytest.mark.filterwarnings("ignore:flex_attention called without torch.compile")
+def test_nonzero_finetune_seed_gets_fs_suffix_and_changes_lora_init(tmp_path):
+    run = _parent(tmp_path)
+    s0 = finetune(_cfg(tmp_path, run, method="lora", rank=2, task="code", lr=1e-2), device="cpu")
+    s1 = finetune(_cfg(tmp_path, run, method="lora", rank=2, task="code", lr=1e-2, seed=1),
+                  device="cpu")
+    assert s1.name == "parent__lora2_code_fs1"
+    assert json.loads((s1 / "results.json").read_text())["seed"] == 1
+    a, b = torch.load(s0 / "lora.pt"), torch.load(s1 / "lora.pt")
+    k = next(iter(a))
+    assert not torch.equal(a[k]["A"], b[k]["A"])

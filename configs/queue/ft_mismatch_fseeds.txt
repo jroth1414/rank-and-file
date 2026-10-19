@@ -1,0 +1,56 @@
+# configs/queue/ft_mismatch_fseeds.txt — launched 2026-10-20 00:01 (CLAUDE.md §11, 2026-10-19).
+# Part 1: optimizer-mismatch control. Full FT with Muon (hidden matrices; AdamW on embeddings/norms)
+# on P1/P2/P3 s0 at three LRs per task. The LR is selected on P1 s0 only (never per twin); the P2/P3
+# runs at the other LRs show whether the forgetting gap depends on the LR.
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.0003 --name p1_adamw_m124_s0__fullmuon_code_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.001 --name p1_adamw_m124_s0__fullmuon_code_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.003 --name p1_adamw_m124_s0__fullmuon_code_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task code --optimizer muon --lr 0.0003 --name p2_muon_m124_s0__fullmuon_code_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task code --optimizer muon --lr 0.001 --name p2_muon_m124_s0__fullmuon_code_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task code --optimizer muon --lr 0.003 --name p2_muon_m124_s0__fullmuon_code_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.0003 --name p3_adamw_m124_s0__fullmuon_code_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.001 --name p3_adamw_m124_s0__fullmuon_code_lr1e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task code --optimizer muon --lr 0.003 --name p3_adamw_m124_s0__fullmuon_code_lr3e-3
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task sup --optimizer muon --lr 3e-05 --name p1_adamw_m124_s0__fullmuon_sup_lr3e-5
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task sup --optimizer muon --lr 0.0001 --name p1_adamw_m124_s0__fullmuon_sup_lr1e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p1_adamw_m124_s0 --method full --task sup --optimizer muon --lr 0.0003 --name p1_adamw_m124_s0__fullmuon_sup_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup --optimizer muon --lr 3e-05 --name p2_muon_m124_s0__fullmuon_sup_lr3e-5
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup --optimizer muon --lr 0.0001 --name p2_muon_m124_s0__fullmuon_sup_lr1e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup --optimizer muon --lr 0.0003 --name p2_muon_m124_s0__fullmuon_sup_lr3e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task sup --optimizer muon --lr 3e-05 --name p3_adamw_m124_s0__fullmuon_sup_lr3e-5
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task sup --optimizer muon --lr 0.0001 --name p3_adamw_m124_s0__fullmuon_sup_lr1e-4
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task sup --optimizer muon --lr 0.0003 --name p3_adamw_m124_s0__fullmuon_sup_lr3e-4
+# Part 2: fine-tuning seeds 1 and 2 (LoRA init + batch order; data subsets fixed) on P2 s0 and P3 s0,
+# full grid at the frozen LRs (lines from scripts/ft_grid.py --seed N).
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task code --lr 0.001 --seed 1 --name p2_muon_m124_s0__full_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 4 --lr 0.01 --seed 1 --name p2_muon_m124_s0__lora4_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 16 --lr 0.01 --seed 1 --name p2_muon_m124_s0__lora16_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 64 --lr 0.003 --seed 1 --name p2_muon_m124_s0__lora64_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup --lr 0.0001 --seed 1 --name p2_muon_m124_s0__full_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 4 --lr 0.001 --seed 1 --name p2_muon_m124_s0__lora4_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 16 --lr 0.001 --seed 1 --name p2_muon_m124_s0__lora16_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 64 --lr 0.0003 --seed 1 --name p2_muon_m124_s0__lora64_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task code --lr 0.001 --seed 1 --name p3_adamw_m124_s0__full_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 4 --lr 0.01 --seed 1 --name p3_adamw_m124_s0__lora4_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 16 --lr 0.01 --seed 1 --name p3_adamw_m124_s0__lora16_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 64 --lr 0.003 --seed 1 --name p3_adamw_m124_s0__lora64_code_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task sup --lr 0.0001 --seed 1 --name p3_adamw_m124_s0__full_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 4 --lr 0.001 --seed 1 --name p3_adamw_m124_s0__lora4_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 16 --lr 0.001 --seed 1 --name p3_adamw_m124_s0__lora16_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 64 --lr 0.0003 --seed 1 --name p3_adamw_m124_s0__lora64_sup_fs1
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task code --lr 0.001 --seed 2 --name p2_muon_m124_s0__full_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 4 --lr 0.01 --seed 2 --name p2_muon_m124_s0__lora4_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 16 --lr 0.01 --seed 2 --name p2_muon_m124_s0__lora16_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task code --rank 64 --lr 0.003 --seed 2 --name p2_muon_m124_s0__lora64_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup --lr 0.0001 --seed 2 --name p2_muon_m124_s0__full_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 4 --lr 0.001 --seed 2 --name p2_muon_m124_s0__lora4_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 16 --lr 0.001 --seed 2 --name p2_muon_m124_s0__lora16_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup --rank 64 --lr 0.0003 --seed 2 --name p2_muon_m124_s0__lora64_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task code --lr 0.001 --seed 2 --name p3_adamw_m124_s0__full_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 4 --lr 0.01 --seed 2 --name p3_adamw_m124_s0__lora4_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 16 --lr 0.01 --seed 2 --name p3_adamw_m124_s0__lora16_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task code --rank 64 --lr 0.003 --seed 2 --name p3_adamw_m124_s0__lora64_code_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method full --task sup --lr 0.0001 --seed 2 --name p3_adamw_m124_s0__full_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 4 --lr 0.001 --seed 2 --name p3_adamw_m124_s0__lora4_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 16 --lr 0.001 --seed 2 --name p3_adamw_m124_s0__lora16_sup_fs2
+.venv\Scripts\python.exe -m rankfile.finetune --parent runs/p3_adamw_m124_s0 --method lora --task sup --rank 64 --lr 0.0003 --seed 2 --name p3_adamw_m124_s0__lora64_sup_fs2

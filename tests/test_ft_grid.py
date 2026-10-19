@@ -44,3 +44,16 @@ def test_grid_lines_use_per_rank_lora_lr():
     assert "--rank 4 --lr 0.03 --name p3_adamw_m124_s0__lora4_code" in "\n".join(lines)
     assert "--rank 64 --lr 0.001 --name p3_adamw_m124_s0__lora64_code" in "\n".join(lines)
     assert "--rank 64 --lr 0.001 --name p3_adamw_m124_s0__lora64_sup" in "\n".join(lines)
+
+
+def test_grid_lines_with_finetune_seed_pass_seed_and_suffix_names():
+    lrs = {("full", "code"): 1e-3, ("full", "sup"): 1e-4,
+           ("lora", "code"): 1e-2, ("lora", "sup"): 1e-3}
+    lines = grid_lines(["runs/p2_muon_m124_s0"], ranks=[16], tasks=["sup"], lrs=lrs,
+                       py="py", seed=2)
+    assert lines == [
+        "py -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method full --task sup "
+        "--lr 0.0001 --seed 2 --name p2_muon_m124_s0__full_sup_fs2",
+        "py -m rankfile.finetune --parent runs/p2_muon_m124_s0 --method lora --task sup "
+        "--rank 16 --lr 0.001 --seed 2 --name p2_muon_m124_s0__lora16_sup_fs2",
+    ]

@@ -14,6 +14,7 @@ from rankfile.config import apply_overrides, from_dict, load_yaml, to_yaml
 from rankfile.data import FixedOrderSampler, TokenStream, list_shards, make_batch
 from rankfile.lora import apply_lora, lora_state_dict
 from rankfile.model import ModelConfig, Transformer, doc_block_mask
+from rankfile.optim.build import build_optimizers, set_lr
 from rankfile.schedule import wsd_lr
 from rankfile.tasks import (
     SUP_TASKS,
@@ -36,6 +37,9 @@ class FinetuneConfig:
     alpha: float | None = None     # None resolves to 2 * rank at run time
     task: str = "code"             # code | sup
     lr: float = 1e-4
+    # adamw | muon. muon (full FT only) is the optimizer-mismatch control: Muon on the
+    # hidden matrices, AdamW on embeddings and norm gains, as in Muon pretraining.
+    optimizer: str = "adamw"
     weight_decay: float = 0.0
     warmup_frac: float = 0.05
     decay_frac: float = 0.5
@@ -154,8 +158,16 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     on_cuda = str(device).startswith("cuda")
     parent_name = Path(cfg.parent).name
+    if cfg.optimizer not in ("adamw", "muon"):
+        raise ValueError(f"unknown optimizer {cfg.optimizer!r}; use 'adamw' or 'muon'")
+    if cfg.optimizer == "muon" and cfg.method != "full":
+        raise ValueError("optimizer 'muon' is only supported with method 'full'")
     tag = "full" if cfg.method == "full" else f"lora{cfg.rank}"
-    cfg.name = cfg.name or f"{parent_name}__{tag}_{cfg.task}"
+    if cfg.optimizer == "muon":
+        tag += "muon"
+    # Fine-tuning seed 0 keeps the canonical name; other seeds get an _fs{seed} suffix.
+    fs = f"_fs{cfg.seed}" if cfg.seed != 0 else ""
+    cfg.name = cfg.name or f"{parent_name}__{tag}_{cfg.task}{fs}"
     run = Path(cfg.out_root) / cfg.name
     run.mkdir(parents=True, exist_ok=True)
     to_yaml(cfg, run / "config.resolved.yaml")
@@ -172,7 +184,11 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     else:
         alpha = None
         params = list(model.parameters())
-    opt = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=cfg.weight_decay)
+    if cfg.optimizer == "muon":
+        opts = build_optimizers(model, "muon", cfg.lr, cfg.weight_decay)
+    else:
+        opts = [torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95),
+                                  weight_decay=cfg.weight_decay)]
     loss_fn = torch.compile(model.loss, dynamic=False) if (cfg.compile and on_cuda) else model.loss
 
     def ac():
@@ -201,8 +217,7 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
     if cfg.task == "code":
         pos = 0
         for step in range(steps):
-            for g in opt.param_groups:
-                g["lr"] = wsd_lr(step, steps, cfg.lr, cfg.warmup_frac, cfg.decay_frac)
+            set_lr(opts, wsd_lr(step, steps, cfg.lr, cfg.warmup_frac, cfg.decay_frac))
             acc = torch.zeros((), device=device)
             for _ in range(accum):
                 x, y, d = make_batch(ts, sampler, pos, cfg.micro_batch, cfg.seq_len, device)
@@ -215,12 +230,13 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
                 loss.backward()
                 acc += loss.detach()
             torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
-            opt.step()
-            opt.zero_grad(set_to_none=True)
+            for o in opts:
+                o.step()
+                o.zero_grad(set_to_none=True)
             mem = _mem_guard(on_cuda, step + 1, cfg.mem_ceiling_gib)
             if step % 10 == 0:
                 mem_reserved = torch.cuda.max_memory_reserved() / 2**30 if on_cuda else 0.0
-                log.write(step=step, loss=acc.item(), lr=opt.param_groups[0]["lr"],
+                log.write(step=step, loss=acc.item(), lr=opts[0].param_groups[0]["lr"],
                           mem_gib=mem, mem_reserved_gib=mem_reserved)
     else:  # sup
         examples = []
@@ -235,20 +251,20 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         for _ in range(cfg.epochs):
             order = torch.randperm(len(examples), generator=g).tolist()
             for batch_idx in _bucketed_batches(examples, order, cfg.sup_batch, g):
-                for pg in opt.param_groups:
-                    pg["lr"] = wsd_lr(step, steps, cfg.lr, cfg.warmup_frac, cfg.decay_frac)
+                set_lr(opts, wsd_lr(step, steps, cfg.lr, cfg.warmup_frac, cfg.decay_frac))
                 batch = [examples[j] for j in batch_idx]
                 ids, mask = collate_sup(batch)
                 with ac():
                     loss = sup_loss(model, ids.to(device), mask.to(device))
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
-                opt.step()
-                opt.zero_grad(set_to_none=True)
+                for o in opts:
+                    o.step()
+                    o.zero_grad(set_to_none=True)
                 mem = _mem_guard(on_cuda, step + 1, cfg.mem_ceiling_gib)
                 if step % 10 == 0:
                     mem_reserved = torch.cuda.max_memory_reserved() / 2**30 if on_cuda else 0.0
-                    log.write(step=step, loss=loss.item(), lr=opt.param_groups[0]["lr"],
+                    log.write(step=step, loss=loss.item(), lr=opts[0].param_groups[0]["lr"],
                               mem_gib=mem, mem_reserved_gib=mem_reserved)
                 step += 1
     train_seconds = time.time() - t0
@@ -271,6 +287,7 @@ def finetune(cfg: FinetuneConfig, device: str | None = None) -> Path:
         "alpha": alpha,
         "task": cfg.task,
         "lr": cfg.lr,
+        "optimizer": cfg.optimizer,
         "seed": cfg.seed,
         "before": before,
         "after": after,
@@ -287,6 +304,8 @@ def main() -> Path:
     ap.add_argument("--task", choices=["code", "sup"], required=True)
     ap.add_argument("--rank", type=int, default=16)
     ap.add_argument("--lr", type=float, default=None)
+    ap.add_argument("--optimizer", choices=["adamw", "muon"], default=None)
+    ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--config", default=None, help="optional YAML with FinetuneConfig fields")
     ap.add_argument("--name", default=None)
     ap.add_argument("--set", action="append", default=[])
@@ -296,6 +315,10 @@ def main() -> Path:
     d.update(parent=a.parent, method=a.method, task=a.task, rank=a.rank)
     if a.lr is not None:
         d["lr"] = a.lr
+    if a.optimizer is not None:
+        d["optimizer"] = a.optimizer
+    if a.seed is not None:
+        d["seed"] = a.seed
     base = from_dict(FinetuneConfig, {})
     merged = apply_overrides({**base.__dict__, **d}, a.set)
     cfg = from_dict(FinetuneConfig, merged)

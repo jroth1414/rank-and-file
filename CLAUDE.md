@@ -539,6 +539,31 @@ Append, never rewrite. Format: date, decision, reason.
   sup LoRA r16 s0 +1.085 vs +0.431, s1 +1.054 vs +0.391; code full FT
   +0.683/+0.678 vs +0.615/+0.619. The forgetting gap is the largest
   replicated fine-tuning effect in the study and was not hypothesized.
+- **2026-10-19** — **Proposal feedback: optimizer-mismatch control and
+  fine-tuning seeds added; meaningful-gap threshold fixed before they run.**
+  The instructor flagged (a) fine-tuning a Muon-pretrained model with AdamW
+  as a known mismatch that could drive the result, and (b) that one
+  fine-tuning seed cannot separate a LoRA-gap difference from noise. Every
+  fine-tuning run so far used AdamW and fine-tuning seed 0 (the seed-1 grid
+  varied only the pretraining seed). (a) `finetune.py` gains `--optimizer
+  muon` for full FT only (Muon on hidden matrices, AdamW on embeddings and
+  norm gains, as in pretraining; weight decay 0 as in AdamW FT). LoRA stays
+  on AdamW: its A/B factors are freshly initialized, so there is no
+  pretraining-optimizer state to mismatch. Muon full FT runs at three LRs per
+  task (code 3e-4/1e-3/3e-3, sup 3e-5/1e-4/3e-4) on P1/P2/P3 s0; the LR is
+  selected on P1 s0 only, and the other-LR runs on P2/P3 show whether the sup
+  forgetting gap depends on the LR. Names: `{parent}__fullmuon_{task}_lr{v}`.
+  (b) Fine-tuning seeds 1 and 2 (LoRA init and batch order; the sup train/eval
+  subsets are cached and identical across seeds) on the full grid for P2 s0
+  and P3 s0 at the frozen LRs. Names get `_fs{seed}`; seed 0 keeps the
+  canonical name. Queue: `configs/queue/ft_mismatch_fseeds.txt`, 50 runs,
+  ~10.7 h, scheduled 2026-10-20 00:01. **Threshold, fixed now, before any
+  fine-tuning-seed or Muon-FT result exists:** a P2−P3 difference in LoRA
+  recovered fraction counts as meaningful only if |mean| ≥ 0.02 and its 95%
+  t-interval over the three fine-tuning seeds (0, 1, 2; paired by seed,
+  df = 2) excludes zero. The paper states that this threshold was set after
+  the two-pretraining-seed H3 results (2026-10-07) were known, so it is not a
+  pre-registration for H3 as originally run.
 
 ## 12. Key references (full list in proposal.md)
 
